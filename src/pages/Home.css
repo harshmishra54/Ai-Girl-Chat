@@ -1,0 +1,41 @@
+.home-container {
+  text-align: center;
+  padding: 30px;
+  font-family: 'Arial', sans-serif;
+  background: #fff0f5;
+  min-height: 100vh;
+}
+
+.profile-card {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  display: inline-block;
+  margin-top: 40px;
+}
+
+.ai-image {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 20px;
+}
+
+.chat-btn {
+  background-color: #ff69b4;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 30px;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.signup-link {
+  color: #ff1493;
+  cursor: pointer;
+  font-weight: bold;
+}
