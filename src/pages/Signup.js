@@ -1,6 +1,6 @@
 // src/pages/Signup.js
 import React, { useState } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
 import { useNavigate } from 'react-router-dom';
 
 const Signup = () => {
@@ -15,7 +15,7 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/register', formData);
+      const res = await axiosInstance.post('/auth/signup', formData);
       setMessage(res.data.message);
       setTimeout(() => {
         navigate('/login');

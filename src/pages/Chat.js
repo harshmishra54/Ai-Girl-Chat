@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import axiosInstance from '../utils/axios';
 import { useNavigate } from "react-router-dom";
 
 const randomBotNames = [
@@ -25,11 +25,9 @@ const Chat = () => {
     const token = localStorage.getItem("token");
     if (!token) return navigate("/login");
 
-    axios
-      .get("http://localhost:8080/api/user/profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      .then((res) => {
+axiosInstance.get("/user/profile", {
+  headers: { Authorization: `Bearer ${token}` },
+}).then((res) => {
         setUser(res.data.user);
         const randomName = randomBotNames[Math.floor(Math.random() * randomBotNames.length)];
         setBotName(randomName);
@@ -62,12 +60,14 @@ const Chat = () => {
 
     try {
       const token = localStorage.getItem("token");
+      const res = await axiosInstance.post(
+  "/chat/chat",
+  { message: userMessage },
+  { headers: { Authorization: `Bearer ${token}` } }
+);
 
-      const res = await axios.post(
-        "http://localhost:8080/api/chat/chat",
-        { message: userMessage },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+
+
 
       const botReply = res.data.reply || "Sorry, I have no answer for that.";
       setMessages((prev) => [
