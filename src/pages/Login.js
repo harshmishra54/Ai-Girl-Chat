@@ -1,6 +1,7 @@
 // src/pages/Login.js
 import React, { useState } from 'react';
-import axios from 'axios';
+import axiosInstance from '../utils/axios';
+ // <-- import your axios instance here
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
@@ -15,10 +16,10 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('http://localhost:8080/api/auth/login', formData);
+      // Use axiosInstance with relative path
+      const res = await axiosInstance.post('/auth/login', formData);
       setMessage(res.data.message);
       localStorage.setItem('token', res.data.token);
-      // Redirect to chat page after login if needed
       navigate("/chat");
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
