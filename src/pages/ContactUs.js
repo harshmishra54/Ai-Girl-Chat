@@ -14,10 +14,7 @@ const ContactUs = () => {
         <p>support@aigirlchat.com</p>
       </div>
 
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold">Phone:</h2>
-        <p>+91-9876543210</p>
-      </div>
+
 
       <div className="mb-4">
         <h2 className="text-xl font-semibold">Office Address:</h2>
