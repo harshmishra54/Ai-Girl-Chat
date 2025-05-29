@@ -11,24 +11,19 @@ connectDB();
 
 const app = express();
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://ai-girl-chat.netlify.app"
-];
-
+// ✅ CORS setup for Netlify frontend
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: "https://ai-girl-chat.netlify.app",
     credentials: true,
   })
 );
+
+// ✅ Ensure preflight requests are handled
+app.options("*", cors({
+  origin: "https://ai-girl-chat.netlify.app",
+  credentials: true,
+}));
 
 app.use(express.json());
 
