@@ -15,7 +15,7 @@ const Signup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axiosInstance.post('/auth/signup', formData);
+      const res = await axiosInstance.post('/auth/register', formData);
       setMessage(res.data.message);
       setTimeout(() => {
         navigate('/login');
