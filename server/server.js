@@ -20,10 +20,9 @@ app.use(
 );
 
 // ✅ Ensure preflight requests are handled
-app.options("*", cors({
-  origin: "https://ai-girl-chat.netlify.app",
-  credentials: true,
-}));
+
+
+
 
 app.use(express.json());
 
