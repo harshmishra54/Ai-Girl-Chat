@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const instance = axios.create({
-  baseURL: "http://localhost:8080/api/v1", // change if your backend port is different
-  withCredentials: true, // optional, use if handling cookies
+  baseURL: process.env.REACT_APP_BASEURL, // ✅ using your env variable
+  withCredentials: true, // optional if not using cookies
 });
 
 export default instance;
