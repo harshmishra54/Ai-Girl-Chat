@@ -31,6 +31,15 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
+// ✅ MongoDB Message Log Schema
+const messageSchema = new mongoose.Schema({
+  telegramId: String,
+  message: String,
+  response: String,
+  timestamp: { type: Date, default: Date.now },
+});
+const MessageLog = mongoose.model("MessageLog", messageSchema);
+
 // ✅ Webhook endpoint
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
@@ -46,7 +55,30 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   const now = new Date();
 
-  // ✅ Handle /verify <payment_id>
+  // Handle /start command
+  if (text === "/start") {
+    await bot.sendMessage(
+      chatId,
+      "👋 Welcome to *AI Girl Chat*!\n\nYou can chat with the AI now.\nYou get 10 minutes of free access!\n\nUse `/verify <payment_id>` to unlock unlimited access.",
+      { parse_mode: "Markdown" }
+    );
+    return res.sendStatus(200);
+  }
+
+  // Handle /help command
+  if (text === "/help") {
+    await bot.sendMessage(
+      chatId,
+      "🆘 *Available Commands:*\n" +
+        "/start - Get started\n" +
+        "/verify <payment_id> - Verify your payment\n" +
+        "/help - Show this help message",
+      { parse_mode: "Markdown" }
+    );
+    return res.sendStatus(200);
+  }
+
+  // Handle /verify <payment_id>
   if (text.startsWith("/verify")) {
     const parts = text.split(" ");
     const paymentId = parts[1];
@@ -73,7 +105,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // ✅ Trial or Subscription logic
+  // Trial or Subscription logic
   if (!user.paymentVerified) {
     const minutesUsed = (now - user.freeChatStart) / 60000;
     if (minutesUsed > 10) {
@@ -117,6 +149,14 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     };
 
     const aiReply = await sendMessageToApi(text);
+
+    // Log message and reply to DB
+    await MessageLog.create({
+      telegramId: chatId,
+      message: text,
+      response: aiReply,
+    });
+
     await bot.sendMessage(chatId, aiReply);
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
