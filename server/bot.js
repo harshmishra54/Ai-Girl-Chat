@@ -19,7 +19,7 @@ const bot = APP_URL
 const app = express();
 app.use(express.json());
 
-// ✅ MongoDB User Schema
+// User schema
 const userSchema = new mongoose.Schema({
   telegramId: String,
   email: String,
@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model("User", userSchema);
 
-// ✅ MongoDB Message Log Schema
+// Message log schema
 const messageSchema = new mongoose.Schema({
   telegramId: String,
   message: String,
@@ -40,7 +40,7 @@ const messageSchema = new mongoose.Schema({
 });
 const MessageLog = mongoose.model("MessageLog", messageSchema);
 
-// ✅ Webhook endpoint
+// Webhook endpoint
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
   const chatId = update.message?.chat?.id;
@@ -48,9 +48,15 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (!chatId || !text) return res.sendStatus(200);
 
+  console.log(`Received message from ${chatId}: ${text}`);
+
   let user = await User.findOne({ telegramId: chatId });
+  let isNewUser = false;
+
   if (!user) {
-    user = await User.create({ telegramId: chatId });
+    user = await User.create({ telegramId: chatId, freeChatStart: new Date() });
+    isNewUser = true;
+    console.log(`Created new user ${chatId} with freeChatStart ${user.freeChatStart}`);
   }
 
   const now = new Date();
@@ -108,6 +114,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   // Trial or Subscription logic
   if (!user.paymentVerified) {
     const minutesUsed = (now - user.freeChatStart) / 60000;
+    console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
+
     if (minutesUsed > 10) {
       await bot.sendMessage(
         chatId,
@@ -116,7 +124,17 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       );
       return res.sendStatus(200);
     }
-  } else if (user.planExpiresAt < now) {
+
+    // Send welcome message on the very first message after user creation (non-command)
+    if (isNewUser && !text.startsWith("/")) {
+      await bot.sendMessage(
+        chatId,
+        "👋 Welcome! You have a 10-minute free trial to chat with AI.\n" +
+          "After that, you can buy a subscription.\n\nType /help for commands."
+      );
+      return res.sendStatus(200);
+    }
+  } else if (user.planExpiresAt && user.planExpiresAt < now) {
     await bot.sendMessage(
       chatId,
       "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify <payment_id>`.",
@@ -125,8 +143,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
+  // Send message to AI API and reply
   try {
-    // Retry logic to handle errors from AI API
     const sendMessageToApi = async (message, retries = 1) => {
       try {
         const response = await axios.post(
@@ -150,7 +168,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     const aiReply = await sendMessageToApi(text);
 
-    // Log message and reply to DB
     await MessageLog.create({
       telegramId: chatId,
       message: text,
@@ -166,7 +183,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   res.sendStatus(200);
 });
 
-// ✅ DB Connection and Webhook Setup
+// DB connection and webhook setup
 (async () => {
   try {
     await mongoose.connect(MONGO_URI);
