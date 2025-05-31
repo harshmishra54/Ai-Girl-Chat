@@ -20,7 +20,7 @@ const Login = () => {
       const res = await axiosInstance.post('/auth/login', formData);
       setMessage(res.data.message);
       localStorage.setItem('token', res.data.token);
-      navigate("/chat");
+      navigate("/bot");
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
     }
