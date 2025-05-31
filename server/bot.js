@@ -1,23 +1,32 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
+const express = require("express");
 require("dotenv").config();
 
-// Load environment variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const BOT_API_KEY = process.env.BOT_API_KEY;
+const APP_URL = process.env.APP_URL; // https://ai-girl-chat-2.onrender.com
 
-// The backend API endpoint
 const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 
-// Initialize the Telegram bot with polling enabled
-const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+const bot = new TelegramBot(BOT_TOKEN);
 
-// Message handler
-bot.on("message", async (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
+const app = express();
+app.use(express.json());
 
-  if (!text) return;
+app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
+  const update = req.body;
+
+  if (!update.message) {
+    return res.sendStatus(200);
+  }
+
+  const chatId = update.message.chat.id;
+  const text = update.message.text;
+
+  if (!text) {
+    return res.sendStatus(200);
+  }
 
   try {
     const response = await axios.post(
@@ -31,22 +40,26 @@ bot.on("message", async (msg) => {
     );
 
     const aiReply = response.data.reply || "Sorry, I didn't get that.";
-    bot.sendMessage(chatId, aiReply);
+    await bot.sendMessage(chatId, aiReply);
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
-    bot.sendMessage(chatId, "Oops! Something went wrong. Please try again.");
+    await bot.sendMessage(chatId, "Oops! Something went wrong. Please try again.");
   }
+
+  res.sendStatus(200);
 });
 
-// Optional: Start a dummy Express server to keep Render happy
-const express = require("express");
-const app = express();
+(async () => {
+  try {
+    const webhookURL = `${APP_URL}/bot${BOT_TOKEN}`;
+    await bot.setWebHook(webhookURL);
+    console.log("Webhook set to:", webhookURL);
+  } catch (error) {
+    console.error("Failed to set webhook:", error.message);
+  }
+})();
+
 const PORT = process.env.PORT || 3000;
-
-app.get("/", (req, res) => {
-  res.send("Telegram bot is running!");
-});
-
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
