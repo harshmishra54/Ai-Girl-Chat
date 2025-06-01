@@ -6,7 +6,7 @@ const INSTAMOJO_AUTH_TOKEN = process.env.INSTAMOJO_AUTH_TOKEN;
 
 async function checkPaymentStatus(paymentId) {
   try {
-    const res = await axios.get(
+    const response = await axios.get(
       `https://www.instamojo.com/api/1.1/payments/${paymentId}/`,
       {
         headers: {
@@ -16,13 +16,21 @@ async function checkPaymentStatus(paymentId) {
       }
     );
 
-    const payment = res.data.payment;
+    const payment = response.data?.payment;
+
+    if (!payment) {
+      console.warn("⚠️ Payment not found or malformed response:", response.data);
+      return { success: false };
+    }
+
+    const isPaid = payment.status === "Credit";
+
     return {
-      success: payment.status === "Credit",
+      success: isPaid,
       payment,
     };
   } catch (err) {
-    console.error("Instamojo error:", err.response?.data || err.message);
+    console.error("❌ Instamojo Error:", err.response?.data || err.message);
     return { success: false };
   }
 }
