@@ -70,7 +70,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
-      "👋 Welcome to *AI Girl Chat*!\n\nYou can chat with the AI now.\nYou get 10 minutes of free access!\n\nUse `/verify <payment_id>` to unlock unlimited access.",
+      "👋 Welcome to *AI Girl Chat*!\n\nYou can chat with the AI now.\nYou get 10 minutes of free access!\n\nUse `/verify payment_id` to unlock unlimited access.",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
@@ -81,7 +81,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       chatId,
       "🆘 *Available Commands:*\n" +
         "/start - Get started\n" +
-        "/verify <payment_id> - Verify your payment\n" +
+        "/verify payment_id - Verify your payment\n" +
         "/help - Show this help message",
       { parse_mode: "Markdown" }
     );
@@ -93,7 +93,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     const paymentId = parts[1];
 
     if (!paymentId) {
-      await bot.sendMessage(chatId, "❗Usage: `/verify <payment_id>`", {
+      await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
         parse_mode: "Markdown",
       });
       return res.sendStatus(200);
@@ -130,7 +130,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     if (minutesUsed > 10) {
       await bot.sendMessage(
         chatId,
-        "⏳ Your *10-minute free trial* is over.\n\n💳 Buy a plan to continue chatting:\n[Click here to pay](https://aigirlchat54329.mojo.page/ai-girl-chat-membership)\n\nAfter payment, type `/verify <your_payment_id>`",
+        "⏳ Your *10-minute free trial* is over.\n\n💳 Buy a plan to continue chatting:\n[Click here to pay](https://aigirlchat54329.mojo.page/ai-girl-chat-membership)\n\nAfter payment, type `/verify payment_id`",
         { parse_mode: "Markdown" }
       );
       return res.sendStatus(200);
@@ -147,7 +147,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   } else if (!isOwner && user.planExpiresAt && user.planExpiresAt < now) {
     await bot.sendMessage(
       chatId,
-      "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify <payment_id>`.",
+      "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify payment_id`.",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
