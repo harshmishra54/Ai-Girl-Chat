@@ -2,6 +2,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const express = require("express");
 const mongoose = require("mongoose");
+const translate = require("@vitalets/google-translate-api");
 require("dotenv").config();
 
 const checkPaymentStatus = require("./utils/checkPaymentStatus");
@@ -65,7 +66,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
 
   const now = new Date();
-  const isOwner = user.telegramId === "5405202126"; // ✅ You have unlimited access
+  const isOwner = user.telegramId === "5405202126";
 
   if (text === "/start") {
     await bot.sendMessage(
@@ -122,7 +123,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // 🧠 Trial logic — only apply to non-owner users
   if (!user.paymentVerified && !isOwner) {
     const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
     console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
@@ -153,7 +153,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // 🤖 Call AI API
+  // 🤖 Translation + AI API logic
   try {
     const sendMessageToApi = async (message, retries = 1) => {
       try {
@@ -176,15 +176,23 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       }
     };
 
-    const aiReply = await sendMessageToApi(text);
+    // Translate user input to English
+    const { text: translatedToEnglish } = await translate(text, { to: "en" });
 
+    // Send translated input to API
+    const aiReply = await sendMessageToApi(translatedToEnglish);
+
+    // Translate AI reply to Hindi
+    const { text: translatedToHindi } = await translate(aiReply, { to: "hi" });
+
+    // Log and reply
     await MessageLog.create({
       telegramId: chatId,
       message: text,
-      response: aiReply,
+      response: translatedToHindi,
     });
 
-    await bot.sendMessage(chatId, aiReply);
+    await bot.sendMessage(chatId, translatedToHindi);
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
