@@ -22,13 +22,12 @@ app.use(express.json());
 // User schema
 const userSchema = new mongoose.Schema({
   telegramId: String,
-  email: String,
+  email: { type: String, unique: true, sparse: true },
   paymentVerified: { type: Boolean, default: false },
   paymentId: String,
   planExpiresAt: Date,
   freeChatStart: { type: Date, default: Date.now },
 });
-
 const User = mongoose.model("User", userSchema);
 
 // Message log schema
@@ -54,14 +53,21 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   let isNewUser = false;
 
   if (!user) {
-    user = await User.create({ telegramId: chatId, freeChatStart: new Date() });
+    const email = update.message.from?.username
+      ? `${update.message.from.username}@telegram.com`
+      : `${chatId}@anon.com`;
+
+    user = await User.create({
+      telegramId: chatId,
+      email,
+      freeChatStart: new Date(),
+    });
     isNewUser = true;
-    console.log(`Created new user ${chatId} with freeChatStart ${user.freeChatStart}`);
+    console.log(`Created new user ${chatId} with email ${email}`);
   }
 
   const now = new Date();
 
-  // Handle /start command
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
@@ -71,7 +77,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Handle /help command
   if (text === "/help") {
     await bot.sendMessage(
       chatId,
@@ -84,7 +89,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Handle /verify <payment_id>
   if (text.startsWith("/verify")) {
     const parts = text.split(" ");
     const paymentId = parts[1];
@@ -97,7 +101,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     const result = await checkPaymentStatus(paymentId);
     if (result.success) {
       const expiry = new Date();
-      expiry.setDate(expiry.getDate() + 30); // 30 days validity
+      expiry.setDate(expiry.getDate() + 30);
 
       user.paymentVerified = true;
       user.paymentId = paymentId;
@@ -111,9 +115,9 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Trial or Subscription logic
+  // Handle free trial & plan expiry
   if (!user.paymentVerified) {
-    const minutesUsed = (now - user.freeChatStart) / 60000;
+    const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
     console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
 
     if (minutesUsed > 10) {
@@ -125,7 +129,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Send welcome message on the very first message after user creation (non-command)
     if (isNewUser && !text.startsWith("/")) {
       await bot.sendMessage(
         chatId,
@@ -143,7 +146,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Send message to AI API and reply
+  // Send message to AI API
   try {
     const sendMessageToApi = async (message, retries = 1) => {
       try {
