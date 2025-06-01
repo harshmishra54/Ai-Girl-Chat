@@ -2,7 +2,8 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const express = require("express");
 const mongoose = require("mongoose");
-const translate = require("@vitalets/google-translate-api");
+// const translate = require("@vitalets/google-translate-api");
+const { default: translate } = require("@vitalets/google-translate-api"); 
 require("dotenv").config();
 
 const checkPaymentStatus = require("./utils/checkPaymentStatus");
