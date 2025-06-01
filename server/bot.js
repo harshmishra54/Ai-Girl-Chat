@@ -47,8 +47,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (!chatId || !text) return res.sendStatus(200);
 
- 
-
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
 
@@ -67,6 +65,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
 
   const now = new Date();
+  const isOwner = user.telegramId === "1469113335"; // ✅ You have unlimited access
 
   if (text === "/start") {
     await bot.sendMessage(
@@ -94,7 +93,9 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     const paymentId = parts[1];
 
     if (!paymentId) {
-      await bot.sendMessage(chatId, "❗Usage: `/verify <payment_id>`", { parse_mode: "Markdown" });
+      await bot.sendMessage(chatId, "❗Usage: `/verify <payment_id>`", {
+        parse_mode: "Markdown",
+      });
       return res.sendStatus(200);
     }
 
@@ -108,15 +109,21 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       user.planExpiresAt = expiry;
       await user.save();
 
-      await bot.sendMessage(chatId, "✅ Payment verified! You now have full access for 30 days.");
+      await bot.sendMessage(
+        chatId,
+        "✅ Payment verified! You now have full access for 30 days."
+      );
     } else {
-      await bot.sendMessage(chatId, "❌ Payment verification failed. Please check your ID.");
+      await bot.sendMessage(
+        chatId,
+        "❌ Payment verification failed. Please check your ID."
+      );
     }
     return res.sendStatus(200);
   }
 
-  // Handle free trial & plan expiry
-  if (!user.paymentVerified) {
+  // 🧠 Trial logic — only apply to non-owner users
+  if (!user.paymentVerified && !isOwner) {
     const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
     console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
 
@@ -137,7 +144,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       );
       return res.sendStatus(200);
     }
-  } else if (user.planExpiresAt && user.planExpiresAt < now) {
+  } else if (!isOwner && user.planExpiresAt && user.planExpiresAt < now) {
     await bot.sendMessage(
       chatId,
       "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify <payment_id>`.",
@@ -146,7 +153,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // Send message to AI API
+  // 🤖 Call AI API
   try {
     const sendMessageToApi = async (message, retries = 1) => {
       try {
@@ -180,7 +187,10 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     await bot.sendMessage(chatId, aiReply);
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
-    await bot.sendMessage(chatId, "⚠️ Something went wrong. Please try again later.");
+    await bot.sendMessage(
+      chatId,
+      "⚠️ Something went wrong. Please try again later."
+    );
   }
 
   res.sendStatus(200);
