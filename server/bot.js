@@ -47,7 +47,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (!chatId || !text) return res.sendStatus(200);
 
-  console.log(`Received message from ${chatId}: ${text}`);
+ 
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
