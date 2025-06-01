@@ -65,7 +65,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
 
   const now = new Date();
-  const isOwner = user.telegramId === "1469113335"; // ✅ You have unlimited access
+  const isOwner = user.telegramId === "5405202126"; // ✅ You have unlimited access
 
   if (text === "/start") {
     await bot.sendMessage(
