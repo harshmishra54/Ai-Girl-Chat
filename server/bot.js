@@ -2,7 +2,7 @@ const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
 const express = require("express");
 const mongoose = require("mongoose");
-const translate = require("@vitalets/google-translate-api");
+const translate = require("@vitalets/google-translate-api").default;
 require("dotenv").config();
 
 const checkPaymentStatus = require("./utils/checkPaymentStatus");
@@ -40,6 +40,11 @@ const messageSchema = new mongoose.Schema({
 });
 const MessageLog = mongoose.model("MessageLog", messageSchema);
 
+// Escape MarkdownV2 for Telegram safely
+function escapeMarkdown(text) {
+  return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
+}
+
 // Webhook endpoint
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
@@ -71,8 +76,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
-      "👋 Welcome to *AI Girl Chat*!\n\nYou can chat with the AI now.\nYou get 10 minutes of free access!\n\nUse `/verify payment_id` to unlock unlimited access.",
-      { parse_mode: "Markdown" }
+      "*👋 Welcome to AI Girl Chat!*\n\nYou can chat with the AI now.\nYou get *10 minutes of free access*!\n\nUse `/verify payment_id` to unlock unlimited access.",
+      { parse_mode: "MarkdownV2" }
     );
     return res.sendStatus(200);
   }
@@ -80,11 +85,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "/help") {
     await bot.sendMessage(
       chatId,
-      "🆘 *Available Commands:*\n" +
-        "/start - Get started\n" +
-        "/verify payment_id - Verify your payment\n" +
-        "/help - Show this help message",
-      { parse_mode: "Markdown" }
+      "*🆘 Available Commands:*\n/start \\- Get started\n/verify payment_id \\- Verify your payment\n/help \\- Show this help message",
+      { parse_mode: "MarkdownV2" }
     );
     return res.sendStatus(200);
   }
@@ -95,7 +97,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     if (!paymentId) {
       await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
-        parse_mode: "Markdown",
+        parse_mode: "MarkdownV2",
       });
       return res.sendStatus(200);
     }
@@ -112,12 +114,14 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
       await bot.sendMessage(
         chatId,
-        "✅ Payment verified! You now have full access for 30 days."
+        "✅ Payment verified! You now have full access for *30 days*.",
+        { parse_mode: "MarkdownV2" }
       );
     } else {
       await bot.sendMessage(
         chatId,
-        "❌ Payment verification failed. Please check your ID."
+        "❌ Payment verification failed\\. Please check your ID\\.",
+        { parse_mode: "MarkdownV2" }
       );
     }
     return res.sendStatus(200);
@@ -128,27 +132,30 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
 
     if (minutesUsed > 10) {
-      await bot.sendMessage(
-        chatId,
-        "⏳ Your *10-minute free trial* is over.\n\n💳 Buy a plan to continue chatting:\n[Click here to pay](https://aigirlchat54329.mojo.page/ai-girl-chat-membership)\n\nAfter payment, type `/verify payment_id`",
-        { parse_mode: "Markdown" }
-      );
+      const message = "⏳ Your *10-minute free trial* is over\\.\n\n💳 Buy a plan to continue chatting:\n[Click here to pay](https://aigirlchat54329.mojo.page/ai-girl-chat-membership)\n\nAfter payment, type `/verify payment_id`";
+      await bot.sendMessage(chatId, message, {
+        parse_mode: "MarkdownV2",
+        disable_web_page_preview: true,
+      });
       return res.sendStatus(200);
     }
 
     if (isNewUser && !text.startsWith("/")) {
       await bot.sendMessage(
         chatId,
-        "👋 Welcome! You have a 10-minute free trial to chat with AI.\n" +
-          "After that, you can buy a subscription.\n\nType /help for commands."
+        "👋 Welcome\\! You have a *10-minute free trial* to chat with AI\\.\nAfter that, you can buy a subscription\\.\n\nType /help for commands\\.",
+        { parse_mode: "MarkdownV2" }
       );
       return res.sendStatus(200);
     }
   } else if (!isOwner && user.planExpiresAt && user.planExpiresAt < now) {
     await bot.sendMessage(
       chatId,
-      "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify payment_id`.",
-      { parse_mode: "Markdown" }
+      "⚠️ Your plan has expired\\.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify payment_id`\\.",
+      {
+        parse_mode: "MarkdownV2",
+        disable_web_page_preview: true,
+      }
     );
     return res.sendStatus(200);
   }
@@ -176,28 +183,27 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       }
     };
 
-    // Translate user input to English
     const { text: translatedToEnglish } = await translate(text, { to: "en" });
 
-    // Send translated input to API
     const aiReply = await sendMessageToApi(translatedToEnglish);
 
-    // Translate AI reply to Hindi
     const { text: translatedToHindi } = await translate(aiReply, { to: "hi" });
 
-    // Log and reply
     await MessageLog.create({
       telegramId: chatId,
       message: text,
       response: translatedToHindi,
     });
 
-    await bot.sendMessage(chatId, translatedToHindi);
+    await bot.sendMessage(chatId, escapeMarkdown(translatedToHindi), {
+      parse_mode: "MarkdownV2",
+    });
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
       chatId,
-      "⚠️ Something went wrong. Please try again later."
+      "⚠️ Something went wrong\\. Please try again later\\.",
+      { parse_mode: "MarkdownV2" }
     );
   }
 
