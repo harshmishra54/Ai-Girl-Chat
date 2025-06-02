@@ -6,42 +6,76 @@ const PrivacyPolicy = () => {
       <h1 className="text-3xl font-bold mb-6">Privacy Policy</h1>
 
       <p className="mb-6">
-        We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, store, and safeguard your data when you use our website and services.
+        Welcome to <strong>AI Girl Chat </strong>. Your privacy is important to us. This Privacy Policy describes how we collect, use, and protect your data when you interact with our website and our AI-based virtual chat bot services.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Information We Collect</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">What We Collect</h2>
       <p className="mb-6">
-        We collect personal information such as your name, email address, phone number, and payment details when you make transactions through our platform. Additionally, we collect technical information like browser type, IP address, and device information to enhance your user experience.
+        We collect the following minimal user data to provide a personalized chat experience:
+        <ul className="list-disc list-inside mt-2">
+          <li><strong>Username</strong> – to identify you in the chat experience</li>
+          <li><strong>Email Address</strong> – for login, verification, and important updates</li>
+          <li><strong>Telegram ID</strong> – to connect you with the AI chat bot on Telegram</li>
+        </ul>
+        We do not collect any sensitive or financial information directly.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Use of Your Information</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">How We Use Your Data</h2>
       <p className="mb-6">
-        Your information is used to process payments securely, deliver services, communicate updates, and improve our platform. We utilize Razorpay as our trusted payment gateway to handle all payment transactions, ensuring your payment information is processed securely and is never stored on our servers.
+        We use your data solely to:
+        <ul className="list-disc list-inside mt-2">
+          <li>Register and authenticate your account</li>
+          <li>Connect you to your personal AI chat bot</li>
+          <li>Send you updates or respond to your queries</li>
+          <li>Process secure payments via Razorpay (if applicable)</li>
+        </ul>
+        We do not sell or share your personal data with advertisers or third parties without consent.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Data Security</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">AI Chat Interaction</h2>
       <p className="mb-6">
-        We implement industry-standard security measures including encryption, firewalls, and secure socket layer (SSL) technology to protect your personal and payment information from unauthorized access or disclosure.
+        Our platform allows personal interaction with an AI bot. While we strive to maintain privacy, some conversations may be logged for quality improvement or moderation in case of abuse or misuse.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Compliance with Laws</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">Payment Security</h2>
       <p className="mb-6">
-        We comply with applicable data protection laws including the Information Technology Act and, where applicable, GDPR. You have the right to access, update, or delete your personal data as per these regulations.
+        All payment transactions are securely handled through <strong>Razorpay</strong>. We do not store your payment information (card or UPI details) on our servers. Razorpay is PCI-DSS compliant and handles sensitive data securely.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Third-Party Services</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">Data Protection</h2>
       <p className="mb-6">
-        We use third-party service providers such as Razorpay for payment processing. These providers have their own privacy policies and data protection practices.
+        We use SSL encryption, secure servers, and limited access protocols to protect your data. Your Telegram ID is used strictly for bot connection and is not exposed publicly.
       </p>
 
-      <h2 className="text-xl font-semibold mt-6 mb-3">Your Consent</h2>
+      <h2 className="text-xl font-semibold mt-6 mb-3">Your Rights</h2>
       <p className="mb-6">
-        By using our services and submitting your information, you consent to the collection and use of your data as described in this Privacy Policy.
+        You have the right to:
+        <ul className="list-disc list-inside mt-2">
+          <li>Access or update your information</li>
+          <li>Request data deletion or account deactivation</li>
+          <li>Withdraw consent at any time</li>
+        </ul>
+        Please email us to process any such requests.
+      </p>
+
+      <h2 className="text-xl font-semibold mt-6 mb-3">Grievance Redressal</h2>
+      <p className="mb-6">
+        If you have any concerns regarding your data, please contact:
+        <br />
+      
+        <strong>Email:</strong> aigirl54329@gmail.com <br />
+        <strong>Phone:</strong> +91-8109315778 <br />
+        <strong>Address:</strong> Ganesh Nagar, Khandwa Naka, Indore, MP, India
+      </p>
+
+      <h2 className="text-xl font-semibold mt-6 mb-3">Updates to This Policy</h2>
+      <p className="mb-6">
+        This Privacy Policy may be revised periodically. Any changes will be posted on this page with the updated date.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-3">Contact Us</h2>
       <p>
-        If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at <strong>support@aigirlchat.com</strong>.
+        Questions or concerns? Email us at <strong>aigirlchat54329@gmail.com</strong>.
       </p>
     </div>
   );

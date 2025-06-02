@@ -1,35 +1,35 @@
-/* Footer.css */
 .footer {
-  background-color: #2d2d2d;
+  background-color: #1f1f1f;
   color: #fff;
-  padding: 20px 0;
-  margin-top: 40px;
+  padding: 20px;
+  text-align: center;
 }
 
 .footer-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 20px;
+  max-width: 900px;
+  margin: auto;
+}
 
+.footer-links {
+  margin-top: 10px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: center;
+  gap: 15px;
   flex-wrap: wrap;
 }
 
-.footer-text {
-  font-size: 14px;
-  margin: 5px 0;
-}
-
 .footer-links a {
-  margin-left: 15px;
-  color: #ccc;
+  color: #ff69b4;
   text-decoration: none;
-  font-size: 14px;
-  transition: color 0.3s ease;
 }
 
 .footer-links a:hover {
-  color: #ff69b4;
+  text-decoration: underline;
+}
+
+.footer-business-info {
+  margin-top: 15px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #ccc;
 }
