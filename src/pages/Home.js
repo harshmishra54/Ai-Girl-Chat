@@ -2,8 +2,10 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import "./Home.css";
 import Header from "../components/Header"; 
-// Make sure this path is correct
 import Footer from "../components/Footer";
+
+// Import your local image
+import Bot from "../assets/images/Bot.jpg";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -11,7 +13,7 @@ const Home = () => {
   const aiGirl = {
     name: "Sofia",
     bio: "Hey there! I'm Sofia 💕 Your virtual crush here to chat, flirt & have fun 😉",
-    image: "https://i.imgur.com/ZtNJGfB.jpg",
+    image: Bot,  // use imported image here
   };
 
   return (
