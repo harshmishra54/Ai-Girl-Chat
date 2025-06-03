@@ -1,37 +1,28 @@
-const axios = require("axios");
-require("dotenv").config();
+const Razorpay = require("razorpay");
 
-const INSTAMOJO_API_KEY = process.env.INSTAMOJO_API_KEY;
-const INSTAMOJO_AUTH_TOKEN = process.env.INSTAMOJO_AUTH_TOKEN;
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 async function checkPaymentStatus(paymentId) {
   try {
-    const response = await axios.get(
-      `https://www.instamojo.com/api/1.1/payments/${paymentId}/`,
-      {
-        headers: {
-          "X-Api-Key": INSTAMOJO_API_KEY,
-          "X-Auth-Token": INSTAMOJO_AUTH_TOKEN,
-        },
-      }
-    );
+    // Fetch payment link details by paymentId
+    const paymentLink = await razorpay.paymentLink.fetch(paymentId);
 
-    const payment = response.data?.payment;
-
-    if (!payment) {
-      console.warn("⚠️ Payment not found or malformed response:", response.data);
-      return { success: false };
+    if (!paymentLink) {
+      return { success: false, message: "Payment link not found." };
     }
 
-    const isPaid = payment.status === "Credit";
-
-    return {
-      success: isPaid,
-      payment,
-    };
-  } catch (err) {
-    console.error("❌ Instamojo Error:", err.response?.data || err.message);
-    return { success: false };
+    // paymentLink.status can be: 'created', 'paid', 'cancelled', 'expired'
+    if (paymentLink.status === "paid") {
+      return { success: true };
+    } else {
+      return { success: false, message: `Payment status: ${paymentLink.status}` };
+    }
+  } catch (error) {
+    console.error("Error in checkPaymentStatus:", error);
+    return { success: false, message: "Failed to check payment status." };
   }
 }
 
