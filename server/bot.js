@@ -4,7 +4,7 @@ const axios = require("axios");
 const TelegramBot = require("node-telegram-bot-api");
 const connectDB = require("./db");
 const User = require("./models/User");
-const createOrder = require("./utils/createRazorpayOrder");
+const createOrder = require("./utils/createRazorpayorder");
 const crypto = require("crypto");
 
 const app = express();
