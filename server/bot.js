@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const TelegramBot = require("node-telegram-bot-api");
-const connectDB = require("./db");
+const connectDB = require("./config/db");
 const User = require("./models/User");
 const createOrder = require("./utils/createRazorpayorder");
 const crypto = require("crypto");
@@ -30,7 +30,7 @@ app.post(`/bot${process.env.BOT_TOKEN}`, async (req, res) => {
   }
 
   if (text === "/start") {
-    const payLink = `${process.env.APP_URL}/pay/${chatId}`;
+    const payLink = `${process.env.APP_URL}/payment/${chatId}`;
     bot.sendMessage(chatId, `Welcome! Click to pay: ${payLink}`);
   } else {
     if (user.paymentVerified && user.planExpiresAt > new Date()) {
