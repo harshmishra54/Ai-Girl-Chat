@@ -1,0 +1,29 @@
+.payment-container {
+  text-align: center;
+  margin-top: 100px;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+.payment-container h1 {
+  color: #e91e63;
+}
+
+.payment-container p {
+  font-size: 18px;
+  margin: 20px 0;
+}
+
+.payment-container button {
+  padding: 15px 30px;
+  font-size: 18px;
+  background-color: #e91e63;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.payment-container button:hover {
+  background-color: #c2185b;
+}

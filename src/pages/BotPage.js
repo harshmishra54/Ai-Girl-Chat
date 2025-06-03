@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 const BotPage = () => {
   const telegramBotUsername = "AiGirlfriendBot54329Bot";
@@ -9,7 +10,7 @@ const BotPage = () => {
       <div style={styles.card}>
         <h1 style={styles.heading}>✨ Meet Ayesha, Your AI Girlfriend 💖</h1>
         <p style={styles.description}>
-          Tap the button below to start chatting with your personalized AI companion.
+          Enjoy a free 10-minute trial. Tap below to start chatting with your personalized AI companion!
         </p>
         <a
           href={telegramLink}
@@ -19,6 +20,16 @@ const BotPage = () => {
         >
           🚀 Start Here
         </a>
+
+        <div style={styles.divider}></div>
+
+        <p style={styles.upgradeText}>
+          Want to continue chatting after the trial? Unlock unlimited access 👑
+        </p>
+
+        <Link to="/payment" style={styles.premiumButton}>
+          💎 Buy Premium Plan
+        </Link>
       </div>
     </div>
   );
@@ -62,6 +73,27 @@ const styles = {
     fontSize: "18px",
     fontWeight: "bold",
     transition: "background-color 0.3s ease",
+    display: "inline-block",
+  },
+  divider: {
+    margin: "30px 0 20px",
+    borderTop: "1px solid #ddd",
+  },
+  upgradeText: {
+    fontSize: "16px",
+    color: "#333",
+    marginBottom: "15px",
+    fontWeight: "500",
+  },
+  premiumButton: {
+    display: "inline-block",
+    padding: "12px 24px",
+    backgroundColor: "#e75480",
+    color: "#fff",
+    borderRadius: "10px",
+    textDecoration: "none",
+    fontSize: "16px",
+    fontWeight: "bold",
   },
 };
 
