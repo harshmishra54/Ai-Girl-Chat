@@ -26,7 +26,7 @@ const bot = APP_URL
 const app = express();
 app.use(express.json());
 
-// User schema
+// ================= SCHEMAS =================
 const userSchema = new mongoose.Schema({
   telegramId: String,
   email: { type: String, unique: true, sparse: true },
@@ -37,7 +37,6 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model("User", userSchema);
 
-// Message log schema
 const messageSchema = new mongoose.Schema({
   telegramId: String,
   message: String,
@@ -46,33 +45,30 @@ const messageSchema = new mongoose.Schema({
 });
 const MessageLog = mongoose.model("MessageLog", messageSchema);
 
-// Function to create Razorpay payment link
-async function createPaymentLink(telegramId) {
+// ================= PAYMENT LINK FUNCTION =================
+async function createPaymentLink(telegramId, amount, durationLabel) {
   try {
     const paymentLink = await razorpay.paymentLink.create({
-      amount: 9900, // ₹99 in paise
+      amount: amount * 100,
       currency: "INR",
-      description: "AI Girl Chat Premium - 30 days",
+      description: `AI Girl Chat Premium - ${durationLabel}`,
       customer: {
         name: `Telegram User ${telegramId}`,
-        email: `${telegramId}@telegram.com`, // dummy email
+        email: `${telegramId}@telegram.com`,
       },
-      notify: {
-        sms: false,
-        email: false,
-      },
+      notify: { sms: false, email: false },
       reminder_enable: true,
       notes: { telegramId: telegramId.toString() },
-      expiry_date: Math.floor(Date.now() / 1000) + 86400 * 3, // 3 days expiry
+      expiry_date: Math.floor(Date.now() / 1000) + 86400 * 3,
     });
     return paymentLink.short_url;
   } catch (err) {
-    console.error("Razorpay create payment link error:", err);
+    console.error("Razorpay error:", err);
     return null;
   }
 }
 
-// Webhook endpoint for Telegram bot updates
+// ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
   const chatId = update.message?.chat?.id;
@@ -94,16 +90,16 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       freeChatStart: new Date(),
     });
     isNewUser = true;
-    console.log(`Created new user ${chatId} with email ${email}`);
+    console.log(`New user created: ${chatId}`);
   }
 
   const now = new Date();
-  const isOwner = user.telegramId === "5405202126"; // ✅ You have unlimited access
+  const isOwner = user.telegramId === "5405202126";
 
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
-      "👋 Welcome to *AI Girl Chat*!\n\nYou can chat with the AI now.\nYou get 10 minutes of free access!\n\nUse `/verify payment_id` to unlock unlimited access.",
+      "👋 Welcome to *AI Girl Chat*!\n\nYou have 10 minutes of free trial.\nAfter that, choose a subscription:\n\n1️⃣ ₹20 - 1 Day\n2️⃣ ₹59 - 7 Days\n3️⃣ ₹99 - 30 Days\n\nType `/verify payment_id` after payment.",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
@@ -134,8 +130,12 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     const result = await checkPaymentStatus(paymentId);
     if (result.success) {
+      const amount = result.amount / 100;
       const expiry = new Date();
-      expiry.setDate(expiry.getDate() + 30);
+
+      if (amount === 20) expiry.setDate(expiry.getDate() + 1);
+      else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
+      else expiry.setDate(expiry.getDate() + 30);
 
       user.paymentVerified = true;
       user.paymentId = paymentId;
@@ -144,34 +144,36 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
       await bot.sendMessage(
         chatId,
-        "✅ Payment verified! You now have full access for 30 days."
+        `✅ Payment of ₹${amount} verified! Your access is active until ${expiry.toDateString()}.`
       );
     } else {
       await bot.sendMessage(
         chatId,
-        "❌ Payment verification failed. Please check your ID."
+        "❌ Payment verification failed. Please check your payment ID."
       );
     }
     return res.sendStatus(200);
   }
 
-  // 🧠 Trial logic — only apply to non-owner users
+  // ========== TRIAL & EXPIRY CHECK ==========
   if (!user.paymentVerified && !isOwner) {
     const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
-    console.log(`User trial minutes used: ${minutesUsed.toFixed(2)}`);
 
     if (minutesUsed > 10) {
-      const paymentUrl = await createPaymentLink(chatId);
-      if (paymentUrl) {
+      const link1 = await createPaymentLink(chatId, 20, "1 Day");
+      const link2 = await createPaymentLink(chatId, 59, "7 Days");
+      const link3 = await createPaymentLink(chatId, 99, "30 Days");
+
+      if (link1 && link2 && link3) {
         await bot.sendMessage(
           chatId,
-          `⏳ Your *10-minute free trial* is over.\n\n💳 Buy a plan here: ${paymentUrl}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+          `⏳ *Your 10-minute free trial has ended.*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
           { parse_mode: "Markdown" }
         );
       } else {
         await bot.sendMessage(
           chatId,
-          "⚠️ Sorry, we couldn't generate a payment link right now. Please try again later."
+          "⚠️ Could not generate payment links. Please try again later."
         );
       }
       return res.sendStatus(200);
@@ -181,20 +183,20 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       await bot.sendMessage(
         chatId,
         "👋 Welcome! You have a 10-minute free trial to chat with AI.\n" +
-          "After that, you can buy a subscription.\n\nType /help for commands."
+          "After that, choose a plan starting at ₹20.\n\nType /help for commands."
       );
       return res.sendStatus(200);
     }
   } else if (!isOwner && user.planExpiresAt && user.planExpiresAt < now) {
     await bot.sendMessage(
       chatId,
-      "⚠️ Your plan has expired.\n\nPlease [renew your subscription](https://aigirlchat54329.mojo.page/ai-girl-chat-membership) and type `/verify payment_id`.",
+      "⚠️ Your plan has expired.\n\nRenew your subscription:\nhttps://aigirlchat54329.mojo.page/ai-girl-chat-membership\n\nType `/verify payment_id` after payment.",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
   }
 
-  // 🤖 Call AI API
+  // ========== AI CHAT ==========
   try {
     const sendMessageToApi = async (message, retries = 1) => {
       try {
@@ -237,7 +239,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   res.sendStatus(200);
 });
 
-// Razorpay webhook for payment link paid event
+// ================= RAZORPAY WEBHOOK =================
 app.post("/webhook/razorpay", express.json({ type: "application/json" }), async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const signature = req.headers["x-razorpay-signature"];
@@ -257,14 +259,14 @@ app.post("/webhook/razorpay", express.json({ type: "application/json" }), async 
     const telegramId = paymentLink.notes.telegramId;
     const paymentId = paymentLink.payment_id;
 
-    if (!telegramId) {
-      console.warn("Webhook: no telegramId in notes");
-      return res.status(400).send("Missing telegramId");
-    }
+    if (!telegramId) return res.status(400).send("Missing telegramId");
 
-    // Update user payment status
+    const amount = paymentLink.amount / 100;
     const expiry = new Date();
-    expiry.setDate(expiry.getDate() + 30);
+
+    if (amount === 20) expiry.setDate(expiry.getDate() + 1);
+    else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
+    else expiry.setDate(expiry.getDate() + 30);
 
     try {
       await User.findOneAndUpdate(
@@ -276,34 +278,33 @@ app.post("/webhook/razorpay", express.json({ type: "application/json" }), async 
         }
       );
       console.log(`Webhook: Payment verified for user ${telegramId}`);
-    } catch (error) {
-      console.error("Webhook DB update error:", error);
-      return res.status(500).send("DB update failed");
+    } catch (err) {
+      console.error("Webhook DB error:", err);
+      return res.status(500).send("Update failed");
     }
   }
 
   res.status(200).send("ok");
 });
 
+// ================= START SERVER =================
 mongoose
   .connect(MONGO_URI)
   .then(() => {
     console.log("MongoDB connected");
     const PORT = process.env.PORT || 8080;
+
     if (APP_URL) {
       app.listen(PORT, () => {
-        console.log(`Express server running on port ${PORT}`);
+        console.log(`Server running on port ${PORT}`);
       });
 
-      // Set webhook for Telegram bot
       const url = `${APP_URL}/bot${BOT_TOKEN}`;
       bot.setWebHook(url).then(() => {
-        console.log(`Webhook set at ${url}`);
+        console.log(`Webhook set: ${url}`);
       });
     } else {
       console.log("Polling mode active");
     }
   })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
-  });
+  .catch((err) => console.error("MongoDB error:", err));
