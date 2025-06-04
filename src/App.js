@@ -26,7 +26,7 @@ const App = () => {
 
         {/* Protected Routes - only after age verification */}
         <Route
-          path="/home"
+          path="/"
           element={
             <PrivateRoute>
               <Home />
