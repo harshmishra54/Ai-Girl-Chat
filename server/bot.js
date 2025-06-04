@@ -59,11 +59,11 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
       notify: { sms: false, email: false },
       reminder_enable: true,
       notes: { telegramId: telegramId.toString() },
-      expiry_date: Math.floor(Date.now() / 1000) + 86400 * 3,
+      expire_by: Math.floor(Date.now() / 1000) + 86400 * 3, // use 'expire_by' instead of 'expiry_date'
     });
     return paymentLink.short_url;
   } catch (err) {
-    console.error("Razorpay error:", err);
+    console.error("Razorpay error:", err.error || err.message);
     return null;
   }
 }
