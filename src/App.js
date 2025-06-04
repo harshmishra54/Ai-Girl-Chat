@@ -2,35 +2,31 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 import AgeVerification from "./components/AgeVerification";
-// import PaymentPage from "./pages/PaymentPage"; // ✅ add your payment page
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-// import Chat from "./pages/Chat";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import RefundPolicy from "./pages/RefundPolicy";
 import BotPage from "./pages/BotPage";
 import ContactUs from "./pages/ContactUs";
 
-// ✅ Enhanced PrivateRoute to include both verifications
+// ✅ Only checks for age verification now
 const PrivateRoute = ({ children }) => {
   const isVerified = localStorage.getItem("ageVerified") === "true";
-  const isPaid = localStorage.getItem("isPaid") === "true";
-  return isVerified && isPaid ? children : <Navigate to="/payment" replace />;
+  return isVerified ? children : <Navigate to="/" replace />;
 };
 
 const App = () => {
   return (
     <Router>
       <Routes>
-        {/* Public Routes */}
-        <Route path="/age-verification" element={<AgeVerification />} />
-        {/* <Route path="/payment" element={<PaymentPage />} /> */}
+        {/* ✅ First route is Age Verification */}
+        <Route path="/" element={<AgeVerification />} />
 
-        {/* Protected Routes (require age verification + payment) */}
+        {/* Protected Routes - only after age verification */}
         <Route
-          path="/"
+          path="/home"
           element={
             <PrivateRoute>
               <Home />
@@ -53,14 +49,6 @@ const App = () => {
             </PrivateRoute>
           }
         />
-        {/* <Route
-          path="/chat"
-          element={
-            <PrivateRoute>
-              <Chat />
-            </PrivateRoute>
-          }
-        /> */}
         <Route
           path="/privacy"
           element={
