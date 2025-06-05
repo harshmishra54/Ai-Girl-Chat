@@ -240,51 +240,59 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 });
 
 // ================= RAZORPAY WEBHOOK =================
-app.post("/webhook/razorpay", express.json({ type: "application/json" }), async (req, res) => {
+// ======== RAZORPAY WEBHOOK =========
+app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
+  req.rawBody = buf.toString();
+}}), async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const signature = req.headers["x-razorpay-signature"];
-  const body = JSON.stringify(req.body);
 
-  const expectedSignature = crypto.createHmac("sha256", secret).update(body).digest("hex");
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(req.rawBody)
+    .digest("hex");
 
-  if (signature !== expectedSignature) {
-    console.warn("Invalid Razorpay webhook signature");
+  if (signature !== expected) {
     return res.status(400).send("Invalid signature");
   }
 
-  const event = req.body.event;
+  const payload = req.body;
 
-  if (event === "payment_link.paid") {
-    const paymentLink = req.body.payload.payment_link.entity;
-    const telegramId = paymentLink.notes.telegramId;
-    const paymentId = paymentLink.payment_id;
-
-    if (!telegramId) return res.status(400).send("Missing telegramId");
-
-    const amount = paymentLink.amount / 100;
-    const expiry = new Date();
-
-    if (amount === 20) expiry.setDate(expiry.getDate() + 1);
-    else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
-    else expiry.setDate(expiry.getDate() + 30);
+  if (payload.event === "payment_link.paid") {
+    const paymentId = payload.payload.payment.entity.id;
+    const amount = payload.payload.payment.entity.amount;
+    const telegramId = payload.payload.payment_link.entity.notes.telegramId;
 
     try {
-      await User.findOneAndUpdate(
-        { telegramId },
-        {
-          paymentVerified: true,
-          paymentId,
-          planExpiresAt: expiry,
-        }
-      );
-      console.log(`Webhook: Payment verified for user ${telegramId}`);
+      const user = await User.findOne({ telegramId });
+      if (!user) return res.sendStatus(200);
+
+      const expiry = new Date();
+      const inrAmount = amount / 100;
+
+      if (inrAmount === 20) expiry.setDate(expiry.getDate() + 1);
+      else if (inrAmount === 59) expiry.setDate(expiry.getDate() + 7);
+      else expiry.setDate(expiry.getDate() + 30);
+
+      user.paymentVerified = true;
+      user.paymentId = paymentId;
+      user.planExpiresAt = expiry;
+      await user.save();
+
+      if (!APP_URL) {
+        await bot.sendMessage(
+          telegramId,
+          `✅ Payment of ₹${inrAmount} verified! Your access is active until ${expiry.toDateString()}.`
+        );
+      }
+
+      console.log(`✔️ Payment verified for ${telegramId}`);
     } catch (err) {
-      console.error("Webhook DB error:", err);
-      return res.status(500).send("Update failed");
+      console.error("Webhook error:", err.message);
     }
   }
 
-  res.status(200).send("ok");
+  res.sendStatus(200);
 });
 
 // ================= START SERVER =================
