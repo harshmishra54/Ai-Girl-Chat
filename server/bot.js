@@ -218,6 +218,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         throw error;
       }
     };
+     await bot.sendChatAction(chatId, "typing");
 
     const aiReply = await sendMessageToApi(text);
 
