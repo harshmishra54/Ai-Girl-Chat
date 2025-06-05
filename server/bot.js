@@ -198,6 +198,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   // ========== AI CHAT ==========
   try {
+     await bot.sendChatAction(chatId, "typing");
     const sendMessageToApi = async (message, retries = 1) => {
       try {
         const response = await axios.post(
@@ -218,7 +219,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         throw error;
       }
     };
-     await bot.sendChatAction(chatId, "typing");
+    
 
     const aiReply = await sendMessageToApi(text);
 
@@ -229,6 +230,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     });
 
     await bot.sendMessage(chatId, aiReply);
+     await bot.sendMessage(chatId, "👥 15,000 monthly users");
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
