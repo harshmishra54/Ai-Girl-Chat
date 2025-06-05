@@ -6,7 +6,7 @@ const AgeVerification = () => {
 
   const handleYes = () => {
     localStorage.setItem("ageVerified", "true");
-    navigate("/"); // Redirect to home after verification
+    navigate("/home"); // Redirect to home after verification
   };
 
   const handleNo = () => {
