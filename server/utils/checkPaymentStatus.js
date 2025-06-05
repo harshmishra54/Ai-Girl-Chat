@@ -1,4 +1,5 @@
 const Razorpay = require("razorpay");
+require("dotenv").config();
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -7,18 +8,18 @@ const razorpay = new Razorpay({
 
 async function checkPaymentStatus(paymentId) {
   try {
-    // Fetch payment link details by paymentId
-    const paymentLink = await razorpay.paymentLink.fetch(paymentId);
+    // ✅ Correct method to fetch a payment
+    const payment = await razorpay.payments.fetch(paymentId);
 
-    if (!paymentLink) {
-      return { success: false, message: "Payment link not found." };
+    if (!payment) {
+      return { success: false, message: "Payment not found." };
     }
 
-    // paymentLink.status can be: 'created', 'paid', 'cancelled', 'expired'
-    if (paymentLink.status === "paid") {
+    // ✅ Check if payment is captured (i.e., successful)
+    if (payment.status === "captured") {
       return { success: true };
     } else {
-      return { success: false, message: `Payment status: ${paymentLink.status}` };
+      return { success: false, message: `Payment status: ${payment.status}` };
     }
   } catch (error) {
     console.error("Error in checkPaymentStatus:", error);
