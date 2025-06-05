@@ -219,7 +219,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         throw error;
       }
     };
-    
+    await bot.sendChatAction(chatId, "18538 monthly user");
 
     const aiReply = await sendMessageToApi(text);
 
@@ -230,7 +230,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     });
 
     await bot.sendMessage(chatId, aiReply);
-     await bot.sendMessage(chatId, "👥 15,000 monthly users");
+    //  await bot.sendMessage(chatId, "👥 15,000 monthly users");
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
