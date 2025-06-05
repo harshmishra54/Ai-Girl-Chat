@@ -117,78 +117,44 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-if (text.startsWith("/verify")) {
-  const parts = text.split(" ");
-  const paymentId = parts[1];
+  if (text.startsWith("/verify")) {
+    const parts = text.split(" ");
+    const paymentId = parts[1];
 
-  if (!paymentId) {
-    await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
-      parse_mode: "Markdown",
-    });
+    if (!paymentId) {
+      await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
+        parse_mode: "Markdown",
+      });
+      return res.sendStatus(200);
+    }
+
+    const result = await checkPaymentStatus(paymentId);
+    if (result.success) {
+      const amount = result.amount / 100;
+      const expiry = new Date();
+
+      if (amount === 20) expiry.setDate(expiry.getDate() + 1);
+      else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
+      else expiry.setDate(expiry.getDate() + 30);
+
+      user.paymentVerified = true;
+      user.paymentId = paymentId;
+      user.planExpiresAt = expiry;
+      await user.save();
+
+      await bot.sendMessage(
+        chatId,
+        `✅ Payment of ₹${amount} verified! Your access is active until ${expiry.toDateString()}.`
+      );
+    } else {
+      await bot.sendMessage(
+        chatId,
+        "❌ Payment verification failed. Please check your payment ID."
+      );
+    }
     return res.sendStatus(200);
   }
 
-  try {
-    // Fetch the payment details from Razorpay
-    const payment = await razorpay.payments.fetch(paymentId);
-
-    // Check if payment was successful
-    if (payment.status !== "captured") {
-      return await bot.sendMessage(
-        chatId,
-        "❌ Payment not completed. Please ensure the payment went through."
-      );
-    }
-
-    // Check if payment already used
-    const usedByOther = await User.findOne({
-      paymentId,
-      telegramId: { $ne: chatId },
-    });
-
-    if (usedByOther) {
-      return await bot.sendMessage(
-        chatId,
-        "🚫 This payment ID has already been used by another account."
-      );
-    }
-
-    // Check if notes.telegramId matches current user
-    const notesTelegramId = payment.notes?.telegramId;
-    if (notesTelegramId && notesTelegramId !== String(chatId)) {
-      return await bot.sendMessage(
-        chatId,
-        "🚫 This payment ID does not belong to your Telegram account."
-      );
-    }
-
-    // Determine plan duration
-    const amount = payment.amount / 100;
-    const expiry = new Date();
-    if (amount === 20) expiry.setDate(expiry.getDate() + 1);
-    else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
-    else expiry.setDate(expiry.getDate() + 30);
-
-    // Save payment
-    user.paymentVerified = true;
-    user.paymentId = paymentId;
-    user.planExpiresAt = expiry;
-    await user.save();
-
-    await bot.sendMessage(
-      chatId,
-      `✅ Payment of ₹${amount} verified! Your access is active until ${expiry.toDateString()}.`
-    );
-  } catch (err) {
-    console.error("Verification error:", err.message || err);
-    await bot.sendMessage(
-      chatId,
-      "❌ Payment verification failed. Please check your payment ID."
-    );
-  }
-
-  return res.sendStatus(200);
-}
   // ========== TRIAL & EXPIRY CHECK ==========
   if (!user.paymentVerified && !isOwner) {
     const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
