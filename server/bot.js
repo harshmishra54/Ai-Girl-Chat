@@ -70,7 +70,7 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
   }
 }
 
-// ================= TELEGRAM WEBHOOK =================
+//// ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
   const chatId = update.message?.chat?.id;
@@ -98,6 +98,25 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const now = new Date();
   const isOwner = user.telegramId === "5405202126";
 
+  // ✅ CHECK FOR PLAN EXPIRY (block access)
+  if (user.paymentVerified && user.planExpiresAt && now > user.planExpiresAt) {
+    user.paymentVerified = false;
+    user.planExpiresAt = null;
+    await user.save();
+
+    const link1 = await createPaymentLink(chatId, 20, "1 Day");
+    const link2 = await createPaymentLink(chatId, 59, "7 Days");
+    const link3 = await createPaymentLink(chatId, 99, "30 Days");
+
+    await bot.sendMessage(
+      chatId,
+      `❌ Your subscription has expired.\n\nChoose a plan to continue:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}`,
+      { parse_mode: "Markdown" }
+    );
+    return res.sendStatus(200);
+  }
+
+  // ================= /start =================
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
@@ -107,6 +126,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
+  // ================= /help =================
   if (text === "/help") {
     await bot.sendMessage(
       chatId,
@@ -119,6 +139,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
+  // ================= /verify payment_id =================
   if (text.startsWith("/verify")) {
     const parts = text.split(" ");
     const paymentId = parts[1];
@@ -131,30 +152,61 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     }
 
     const result = await checkPaymentStatus(paymentId);
-    if (result.success) {
-  const amount = result.amount / 100;
-  const now = new Date();
+    if (!result.success) {
+      await bot.sendMessage(chatId, "❌ Invalid or failed payment ID.");
+      return res.sendStatus(200);
+    }
 
-  user.paymentVerified = true;
-  user.paymentId = paymentId;
-  user.paymentAmount = amount;
-  user.paymentVerifiedAt = now;
-  await user.save();
+    const amount = result.amount / 100;
+    const paymentTime = new Date(result.created_at * 1000); // Razorpay timestamp is in seconds
+    const ageInHours = (now - paymentTime) / 1000 / 60 / 60;
 
-  let expiry = new Date(now);
-  if (amount === 20) expiry.setHours(expiry.getHours() + 24);
-  else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
-  else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
+    // ✅ Check if payment is too old for the selected plan
+    if (
+      (amount === 20 && ageInHours > 24) ||
+      (amount === 59 && ageInHours > 168) ||
+      (amount === 99 && ageInHours > 720)
+    ) {
+      await bot.sendMessage(chatId, "❗This payment has expired. Please buy a new plan.");
+      return res.sendStatus(200);
+    }
 
-  await bot.sendMessage(
-    chatId,
-    `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
-    { parse_mode: "Markdown" }
-  );
-}
+    // ✅ Check if paymentId already used
+    const existingUser = await User.findOne({ paymentId });
+    if (existingUser && existingUser.telegramId !== chatId) {
+      await bot.sendMessage(chatId, "❗This payment ID is already used by another account.");
+      return res.sendStatus(200);
+    }
+
+    // ✅ Save plan info
+    user.paymentVerified = true;
+    user.paymentId = paymentId;
+    user.paymentAmount = amount;
+    user.paymentVerifiedAt = now;
+
+    let expiry = new Date(now);
+    if (amount === 20) expiry.setHours(expiry.getHours() + 24);
+    else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
+    else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
+
+    user.planExpiresAt = expiry;
+    await user.save();
+
+    await bot.sendMessage(
+      chatId,
+      `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
+      { parse_mode: "Markdown" }
+    );
 
     return res.sendStatus(200);
   }
+
+  // TODO: ADD YOUR CHAT HANDLING HERE BELOW...
+  // ...
+
+  return res.sendStatus(200);
+});
+
 
   // ========== TRIAL & EXPIRY CHECK ==========
   if (!user.paymentVerified && !isOwner) {
