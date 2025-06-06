@@ -38,14 +38,15 @@ const userSchema = new mongoose.Schema({
   freeChatStart: { type: Date, default: Date.now },
 });
 const User = mongoose.model("User", userSchema);
-
-const messageSchema = new mongoose.Schema({
+const paymentSchema = new mongoose.Schema({
+  paymentId: { type: String, unique: true },
   telegramId: String,
-  message: String,
-  response: String,
-  timestamp: { type: Date, default: Date.now },
+  amount: Number,
+  verifiedAt: Date,
+  raw: Object, // Optional: store full Razorpay response for logs/audits
 });
-const MessageLog = mongoose.model("MessageLog", messageSchema);
+
+const Payment = mongoose.model("Payment", paymentSchema);
 
 // ================= PAYMENT LINK FUNCTION =================
 async function createPaymentLink(telegramId, amount, durationLabel) {
@@ -118,43 +119,80 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     );
     return res.sendStatus(200);
   }
-
   if (text.startsWith("/verify")) {
-    const parts = text.split(" ");
-    const paymentId = parts[1];
+  const parts = text.split(" ");
+  const paymentId = parts[1];
 
-    if (!paymentId) {
-      await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
-        parse_mode: "Markdown",
-      });
+  if (!paymentId) {
+    await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
+      parse_mode: "Markdown",
+    });
+    return res.sendStatus(200);
+  }
+
+  // Step 1: Prevent duplicate use of paymentId
+  const existingPayment = await Payment.findOne({ paymentId });
+  if (existingPayment) {
+    await bot.sendMessage(
+      chatId,
+      "⚠️ This payment ID has already been used. If you believe this is a mistake, contact support."
+    );
+    return res.sendStatus(200);
+  }
+
+  // Step 2: Check Razorpay payment status
+  const result = await checkPaymentStatus(paymentId);
+
+  if (result.success) {
+    const amount = result.amount / 100;
+    const now = new Date();
+
+    // Step 3: Validate that payment was made by this Telegram user
+    const notesTelegramId = result.notes?.telegramId;
+    if (notesTelegramId !== chatId.toString()) {
+      await bot.sendMessage(
+        chatId,
+        `🚫 This payment was not made using your Telegram account.\nPlease use the link generated for your own ID.`
+      );
       return res.sendStatus(200);
     }
 
-    const result = await checkPaymentStatus(paymentId);
-    if (result.success) {
-  const amount = result.amount / 100;
-  const now = new Date();
+    // Step 4: Update user info
+    user.paymentVerified = true;
+    user.paymentId = paymentId;
+    user.paymentAmount = amount;
+    user.paymentVerifiedAt = now;
+    await user.save();
 
-  user.paymentVerified = true;
-  user.paymentId = paymentId;
-  user.paymentAmount = amount;
-  user.paymentVerifiedAt = now;
-  await user.save();
+    // Step 5: Log payment in Payment collection
+    await Payment.create({
+      paymentId,
+      telegramId: chatId.toString(),
+      amount,
+      verifiedAt: now,
+      raw: result,
+    });
 
-  let expiry = new Date(now);
-  if (amount === 20) expiry.setHours(expiry.getHours() + 24);
-  else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
-  else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
+    // Step 6: Set plan expiry message
+    let expiry = new Date(now);
+    if (amount === 20) expiry.setHours(expiry.getHours() + 24);
+    else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
+    else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
 
-  await bot.sendMessage(
-    chatId,
-    `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
-    { parse_mode: "Markdown" }
-  );
-}
-
-    return res.sendStatus(200);
+    await bot.sendMessage(
+      chatId,
+      `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
+      { parse_mode: "Markdown" }
+    );
+  } else {
+    await bot.sendMessage(
+      chatId,
+      "❌ Payment verification failed. Please make sure the payment ID is correct."
+    );
   }
+
+  return res.sendStatus(200);
+}
 
   // ========== TRIAL & EXPIRY CHECK ==========
   if (!user.paymentVerified && !isOwner) {
