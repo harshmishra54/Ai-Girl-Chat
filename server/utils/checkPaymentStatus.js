@@ -7,7 +7,6 @@ const razorpay = new Razorpay({
 
 async function checkPaymentStatus(paymentId) {
   try {
-    // ✅ Fetch actual payment using paymentId
     const payment = await razorpay.payments.fetch(paymentId);
 
     if (!payment) {
@@ -18,6 +17,8 @@ async function checkPaymentStatus(paymentId) {
       return {
         success: true,
         amount: payment.amount, // still in paisa
+        notes: payment.notes,   // ✅ include notes here
+        raw: payment,           // ✅ optionally include full data for logging
       };
     } else {
       return {
