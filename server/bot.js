@@ -38,6 +38,14 @@ const userSchema = new mongoose.Schema({
   freeChatStart: { type: Date, default: Date.now },
 });
 const User = mongoose.model("User", userSchema);
+
+const messageSchema = new mongoose.Schema({
+  telegramId: String,
+  message: String,
+  response: String,
+  timestamp: { type: Date, default: Date.now },
+});
+const MessageLog = mongoose.model("MessageLog", messageSchema);
 const paymentSchema = new mongoose.Schema({
   paymentId: { type: String, unique: true },
   telegramId: String,
