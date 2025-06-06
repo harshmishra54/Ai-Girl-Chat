@@ -187,14 +187,37 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       );
       return res.sendStatus(200);
     }
-  } else if (!isOwner && user.planExpiresAt && user.planExpiresAt < now) {
-    await bot.sendMessage(
-      chatId,
-      "⚠️ Your plan has expired.\n\nRenew your subscription:\nhttps://aigirlchat54329.mojo.page/ai-girl-chat-membership\n\nType `/verify payment_id` after payment.",
-      { parse_mode: "Markdown" }
-    );
+  }
+   // ========== CHECK PLAN VALIDITY FOR EVERY MESSAGE ==========
+if (!isOwner && user.paymentVerified) {
+  if (!user.planExpiresAt || user.planExpiresAt < now) {
+    // Plan has expired
+    user.paymentVerified = false;
+    user.planExpiresAt = null;
+    await user.save();
+
+    // Generate Razorpay links again
+    const link1 = await createPaymentLink(chatId, 20, "1 Day");
+    const link2 = await createPaymentLink(chatId, 59, "7 Days");
+    const link3 = await createPaymentLink(chatId, 99, "30 Days");
+
+    if (link1 && link2 && link3) {
+      await bot.sendMessage(
+        chatId,
+        `⏳ *Your plan has expired.*\n\nChoose a plan to continue:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await bot.sendMessage(
+        chatId,
+        "⚠️ Could not generate payment links. Please try again later."
+      );
+    }
+
     return res.sendStatus(200);
   }
+}
+
 
   // ========== AI CHAT ==========
   try {
@@ -219,7 +242,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         throw error;
       }
     };
-    // await bot.sendChatAction(chatId, "18538 monthly user");
+    
 
     const aiReply = await sendMessageToApi(text);
 
@@ -230,7 +253,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     });
 
     await bot.sendMessage(chatId, aiReply);
-    //  await bot.sendMessage(chatId, "👥 15,000 monthly users");
+   
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
