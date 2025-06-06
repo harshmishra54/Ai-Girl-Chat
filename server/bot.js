@@ -295,40 +295,44 @@ app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
   }
 
   const payload = req.body;
+if (payload.event === "payment_link.paid") {
+  const paymentId = payload.payload.payment.entity.id;
+  const amount = payload.payload.payment.entity.amount;
+  const telegramId = payload.payload.payment_link.entity.notes.telegramId;
 
-  if (payload.event === "payment_link.paid") {
-    const paymentId = payload.payload.payment.entity.id;
-    const amount = payload.payload.payment.entity.amount;
-    const telegramId = payload.payload.payment_link.entity.notes.telegramId;
+  try {
+    const user = await User.findOne({ telegramId });
+    if (!user) return res.sendStatus(200);
 
-    try {
-      const user = await User.findOne({ telegramId });
-      if (!user) return res.sendStatus(200);
+    const expiry = new Date();
+    const inrAmount = amount / 100;
 
-      const expiry = new Date();
-      const inrAmount = amount / 100;
+    if (inrAmount === 20) expiry.setDate(expiry.getDate() + 1);
+    else if (inrAmount === 59) expiry.setDate(expiry.getDate() + 7);
+    else if (inrAmount === 99) expiry.setDate(expiry.getDate() + 30);
 
-      if (inrAmount === 20) expiry.setDate(expiry.getDate() + 1);
-      else if (inrAmount === 59) expiry.setDate(expiry.getDate() + 7);
-      else expiry.setDate(expiry.getDate() + 30);
+    user.paymentVerified = true;
+    user.paymentId = paymentId;
+    user.planExpiresAt = expiry;
 
-      user.paymentVerified = true;
-      user.paymentId = paymentId;
-      user.planExpiresAt = expiry;
-      await user.save();
+    // ✅ Add these two lines
+    user.paymentAmount = inrAmount;
+    user.paymentVerifiedAt = new Date();
 
-      if (!APP_URL) {
-        await bot.sendMessage(
-          telegramId,
-          `✅ Payment of ₹${inrAmount} verified! Your access is active until ${expiry.toDateString()}.`
-        );
-      }
+    await user.save();
 
-      console.log(`✔️ Payment verified for ${telegramId}`);
-    } catch (err) {
-      console.error("Webhook error:", err.message);
+    if (!APP_URL) {
+      await bot.sendMessage(
+        telegramId,
+        `✅ Payment of ₹${inrAmount} verified! Your access is active until ${expiry.toDateString()}.`
+      );
     }
+
+    console.log(`✔️ Payment verified for ${telegramId}`);
+  } catch (err) {
+    console.error("Webhook error:", err.message);
   }
+}
 
   res.sendStatus(200);
 });
