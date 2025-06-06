@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema({
   telegramId: String,
   email: { type: String, unique: true, sparse: true },
   paymentVerified: { type: Boolean, default: false },
+   paymentAmount: Number, // Add this
+  paymentVerifiedAt: Date, // Add this
   paymentId: String,
   planExpiresAt: Date,
   freeChatStart: { type: Date, default: Date.now },
@@ -130,28 +132,27 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     const result = await checkPaymentStatus(paymentId);
     if (result.success) {
-      const amount = result.amount / 100;
-      const expiry = new Date();
+  const amount = result.amount / 100;
+  const now = new Date();
 
-      if (amount === 20) expiry.setDate(expiry.getDate() + 1);
-      else if (amount === 59) expiry.setDate(expiry.getDate() + 7);
-      else expiry.setDate(expiry.getDate() + 30);
+  user.paymentVerified = true;
+  user.paymentId = paymentId;
+  user.paymentAmount = amount;
+  user.paymentVerifiedAt = now;
+  await user.save();
 
-      user.paymentVerified = true;
-      user.paymentId = paymentId;
-      user.planExpiresAt = expiry;
-      await user.save();
+  let expiry = new Date(now);
+  if (amount === 20) expiry.setHours(expiry.getHours() + 24);
+  else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
+  else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
 
-      await bot.sendMessage(
-        chatId,
-        `✅ Payment of ₹${amount} verified! Your access is active until ${expiry.toDateString()}.`
-      );
-    } else {
-      await bot.sendMessage(
-        chatId,
-        "❌ Payment verification failed. Please check your payment ID."
-      );
-    }
+  await bot.sendMessage(
+    chatId,
+    `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
+    { parse_mode: "Markdown" }
+  );
+}
+
     return res.sendStatus(200);
   }
 
@@ -188,15 +189,25 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       return res.sendStatus(200);
     }
   }
-   // ========== CHECK PLAN VALIDITY FOR EVERY MESSAGE ==========
+   //// ===== CHECK PLAN BASED ON PAYMENT TIMESTAMP =====
 if (!isOwner && user.paymentVerified) {
-  if (!user.planExpiresAt || user.planExpiresAt < now) {
-    // Plan has expired
+  const now = new Date();
+  const verifiedAt = new Date(user.paymentVerifiedAt);
+  const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
+
+  let planExpired = false;
+
+  if (user.paymentAmount === 20 && diffHours > 24) planExpired = true;
+  else if (user.paymentAmount === 59 && diffHours > 168) planExpired = true;
+  else if (user.paymentAmount === 99 && diffHours > 720) planExpired = true;
+
+  if (planExpired) {
     user.paymentVerified = false;
-    user.planExpiresAt = null;
+    user.paymentId = null;
+    user.paymentAmount = null;
+    user.paymentVerifiedAt = null;
     await user.save();
 
-    // Generate Razorpay links again
     const link1 = await createPaymentLink(chatId, 20, "1 Day");
     const link2 = await createPaymentLink(chatId, 59, "7 Days");
     const link3 = await createPaymentLink(chatId, 99, "30 Days");
@@ -204,7 +215,7 @@ if (!isOwner && user.paymentVerified) {
     if (link1 && link2 && link3) {
       await bot.sendMessage(
         chatId,
-        `⏳ *Your plan has expired.*\n\nChoose a plan to continue:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+        `⏳ *Your plan has expired.*\n\nChoose a new plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nType \`/verify payment_id\` after payment.`,
         { parse_mode: "Markdown" }
       );
     } else {
@@ -217,6 +228,7 @@ if (!isOwner && user.paymentVerified) {
     return res.sendStatus(200);
   }
 }
+
 
 
   // ========== AI CHAT ==========
