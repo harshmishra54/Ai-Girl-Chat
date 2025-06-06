@@ -24,12 +24,12 @@ const TermsAndConditions = () => {
         The Service offers various subscription plans including daily, weekly, monthly, and yearly access. Payment is required in advance for all plans and is processed securely through our payment gateway. Users are responsible for managing their own subscriptions, including renewals and cancellations.
         <br />
         <br />
-        All payments are considered final and non-refundable except as specifically stated in our <a href="/refund-policy" className="text-blue-600 underline">Refund Policy</a>.
+        All payments are considered final and non-refundable except as specifically stated in our <a href="/refund" className="text-blue-600 underline">Refund Policy</a>.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-3">3. User Data and Privacy</h2>
       <p className="mb-6">
-        We collect minimal user data such as email, username, and Telegram ID for service access and communication. We respect your privacy and do not sell or share your data with third parties without your consent. For more details, refer to our <a href="/privacy-policy" className="text-blue-600 underline">Privacy Policy</a>.
+        We collect minimal user data such as email, username, and Telegram ID for service access and communication. We respect your privacy and do not sell or share your data with third parties without your consent. For more details, refer to our <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
       </p>
 
       <h2 className="text-xl font-semibold mt-6 mb-3">4. Changes to Terms</h2>
