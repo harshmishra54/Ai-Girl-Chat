@@ -262,6 +262,52 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       return res.sendStatus(200);
     }
   }
+   try {
+    // Fetch last 6 interactions for this user, sorted oldest to newest
+    let lastMessages = await MessageLog
+      .find({ telegramId: chatId })
+      .sort({ timestamp: -1 })  // newest first
+      .limit(6)
+      .lean();
+
+    lastMessages = lastMessages.reverse(); // oldest first for context
+
+    // Construct conversation history string for AI prompt
+    let conversationContext = "";
+    for (const msg of lastMessages) {
+      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+    }
+
+    // Append current user message
+    conversationContext += `User: ${text}\nAI:`;
+
+    // Call your AI API with the conversation context
+    const response = await axios.post(
+      API_URL,
+      { message: conversationContext },
+      { headers: { "x-api-key": BOT_API_KEY } }
+    );
+
+    const aiReply = response.data.reply || "Sorry, I didn't get that.";
+
+    // Save current interaction to DB
+    await MessageLog.create({
+      telegramId: chatId,
+      message: text,
+      response: aiReply,
+      timestamp: new Date(),
+    });
+
+    // Send AI response back to user
+    await bot.sendMessage(chatId, aiReply);
+
+  } catch (error) {
+    console.error("Error handling AI chat:", error);
+    await bot.sendMessage(chatId, "⚠️ Oops! Something went wrong. Please try again later.");
+  }
+
+  return res.sendStatus(200);
+});
    //// ===== CHECK PLAN BASED ON PAYMENT TIMESTAMP =====
 if (!isOwner && user.paymentVerified) {
   const now = new Date();
