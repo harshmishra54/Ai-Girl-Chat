@@ -113,12 +113,12 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     await bot.sendMessage(
       chatId,
       "👋 Hey love ❤️ I'm Ayesha, your virtual girlfriend 🤭 You’ve got 10 minutes of free chat with me! Let’s get to know each other 😉",
-      
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
   }
-    // ========== PHOTO REQUEST HANDLING ==========
+
+  // ========== PHOTO REQUEST HANDLING ==========
   if (/\/photo|send.*photo/i.test(text)) {
     try {
       const imageCount = await Image.countDocuments();
@@ -141,7 +141,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-
   if (text === "/help") {
     await bot.sendMessage(
       chatId,
@@ -153,80 +152,75 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     );
     return res.sendStatus(200);
   }
+
   if (text.startsWith("/verify")) {
-  const parts = text.split(" ");
-  const paymentId = parts[1];
+    const parts = text.split(" ");
+    const paymentId = parts[1];
 
-  if (!paymentId) {
-    await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
-      parse_mode: "Markdown",
-    });
-    return res.sendStatus(200);
-  }
+    if (!paymentId) {
+      await bot.sendMessage(chatId, "❗Usage: `/verify payment_id`", {
+        parse_mode: "Markdown",
+      });
+      return res.sendStatus(200);
+    }
 
-  // Step 1: Prevent duplicate use of paymentId
-  const existingPayment = await Payment.findOne({ paymentId });
-  if (existingPayment) {
-    await bot.sendMessage(
-      chatId,
-      "⚠️ This payment ID has already been used. If you believe this is a mistake, contact support."
-    );
-    return res.sendStatus(200);
-  }
-
-  // Step 2: Check Razorpay payment status
-  const result = await checkPaymentStatus(paymentId);
-
-  if (result.success) {
-    const amount = result.amount / 100;
-    const now = new Date();
-
-    // Step 3: Validate that payment was made by this Telegram user
-    const notesTelegramId = result.notes?.telegramId;
-    if (notesTelegramId !== chatId.toString()) {
+    const existingPayment = await Payment.findOne({ paymentId });
+    if (existingPayment) {
       await bot.sendMessage(
         chatId,
-        `🚫 This payment was not made using your Telegram account.\nPlease use the link generated for your own ID.`
+        "⚠️ This payment ID has already been used. If you believe this is a mistake, contact support."
       );
       return res.sendStatus(200);
     }
 
-    // Step 4: Update user info
-    user.paymentVerified = true;
-    user.paymentId = paymentId;
-    user.paymentAmount = amount;
-    user.paymentVerifiedAt = now;
-    await user.save();
+    const result = await checkPaymentStatus(paymentId);
 
-    // Step 5: Log payment in Payment collection
-    await Payment.create({
-      paymentId,
-      telegramId: chatId.toString(),
-      amount,
-      verifiedAt: now,
-      raw: result,
-    });
+    if (result.success) {
+      const amount = result.amount / 100;
+      const now = new Date();
 
-    // Step 6: Set plan expiry message
-    let expiry = new Date(now);
-    if (amount === 20) expiry.setHours(expiry.getHours() + 24);
-    else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
-    else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
+      const notesTelegramId = result.notes?.telegramId;
+      if (notesTelegramId !== chatId.toString()) {
+        await bot.sendMessage(
+          chatId,
+          `🚫 This payment was not made using your Telegram account.\nPlease use the link generated for your own ID.`
+        );
+        return res.sendStatus(200);
+      }
 
-    await bot.sendMessage(
-      chatId,
-      `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
-      { parse_mode: "Markdown" }
-    );
-  } else {
-    await bot.sendMessage(
-      chatId,
-      "❌ Payment verification failed. Please make sure the payment ID is correct."
-    );
+      user.paymentVerified = true;
+      user.paymentId = paymentId;
+      user.paymentAmount = amount;
+      user.paymentVerifiedAt = now;
+      await user.save();
+
+      await Payment.create({
+        paymentId,
+        telegramId: chatId.toString(),
+        amount,
+        verifiedAt: now,
+        raw: result,
+      });
+
+      let expiry = new Date(now);
+      if (amount === 20) expiry.setHours(expiry.getHours() + 24);
+      else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
+      else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
+
+      await bot.sendMessage(
+        chatId,
+        `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      await bot.sendMessage(
+        chatId,
+        "❌ Payment verification failed. Please make sure the payment ID is correct."
+      );
+    }
+
+    return res.sendStatus(200);
   }
-
-  return res.sendStatus(200);
-}
 
   // ========== TRIAL & EXPIRY CHECK ==========
   if (!user.paymentVerified && !isOwner) {
@@ -262,52 +256,66 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       return res.sendStatus(200);
     }
   }
-  
-   //// ===== CHECK PLAN BASED ON PAYMENT TIMESTAMP =====
-if (!isOwner && user.paymentVerified) {
-  const now = new Date();
-  const verifiedAt = new Date(user.paymentVerifiedAt);
-  const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
 
-  let planExpired = false;
+  //// ===== CHECK PLAN BASED ON PAYMENT TIMESTAMP =====
+  if (!isOwner && user.paymentVerified) {
+    const now = new Date();
+    const verifiedAt = new Date(user.paymentVerifiedAt);
+    const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
 
-  if (user.paymentAmount === 20 && diffHours > 24) planExpired = true;
-  else if (user.paymentAmount === 59 && diffHours > 168) planExpired = true;
-  else if (user.paymentAmount === 99 && diffHours > 720) planExpired = true;
+    let planExpired = false;
 
-  if (planExpired) {
-    user.paymentVerified = false;
-    user.paymentId = null;
-    user.paymentAmount = null;
-    user.paymentVerifiedAt = null;
-    await user.save();
+    if (user.paymentAmount === 20 && diffHours > 24) planExpired = true;
+    else if (user.paymentAmount === 59 && diffHours > 168) planExpired = true;
+    else if (user.paymentAmount === 99 && diffHours > 720) planExpired = true;
 
-    const link1 = await createPaymentLink(chatId, 20, "1 Day");
-    const link2 = await createPaymentLink(chatId, 59, "7 Days");
-    const link3 = await createPaymentLink(chatId, 99, "30 Days");
+    if (planExpired) {
+      user.paymentVerified = false;
+      user.paymentId = null;
+      user.paymentAmount = null;
+      user.paymentVerifiedAt = null;
+      await user.save();
 
-    if (link1 && link2 && link3) {
-      await bot.sendMessage(
-        chatId,
-        `⏳ *Your plan has expired.*\n\nChoose a new plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nType \`/verify payment_id\` after payment.`,
-        { parse_mode: "Markdown" }
-      );
-    } else {
-      await bot.sendMessage(
-        chatId,
-        "⚠️ Could not generate payment links. Please try again later."
-      );
+      const link1 = await createPaymentLink(chatId, 20, "1 Day");
+      const link2 = await createPaymentLink(chatId, 59, "7 Days");
+      const link3 = await createPaymentLink(chatId, 99, "30 Days");
+
+      if (link1 && link2 && link3) {
+        await bot.sendMessage(
+          chatId,
+          `⏳ *Your plan has expired.*\n\nChoose a new plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nType \`/verify payment_id\` after payment.`,
+          { parse_mode: "Markdown" }
+        );
+      } else {
+        await bot.sendMessage(
+          chatId,
+          "⚠️ Could not generate payment links. Please try again later."
+        );
+      }
+
+      return res.sendStatus(200);
     }
-
-    return res.sendStatus(200);
   }
-}
-
-
 
   // ========== AI CHAT ==========
   try {
-     await bot.sendChatAction(chatId, "typing");
+    await bot.sendChatAction(chatId, "typing");
+
+    // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
+    let lastMessages = await MessageLog.find({ telegramId: chatId })
+      .sort({ timestamp: -1 })
+      .limit(6)
+      .lean();
+
+    lastMessages = lastMessages.reverse();
+
+    let conversationContext = "";
+    for (const msg of lastMessages) {
+      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+    }
+
+    conversationContext += `User: ${text}\nAI:`;
+
     const sendMessageToApi = async (message, retries = 1) => {
       try {
         const response = await axios.post(
@@ -328,18 +336,17 @@ if (!isOwner && user.paymentVerified) {
         throw error;
       }
     };
-    
 
-    const aiReply = await sendMessageToApi(text);
+    const aiReply = await sendMessageToApi(conversationContext);
 
     await MessageLog.create({
       telegramId: chatId,
       message: text,
       response: aiReply,
+      timestamp: new Date(),
     });
 
     await bot.sendMessage(chatId, aiReply);
-   
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
