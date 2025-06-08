@@ -4,6 +4,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const Image = require("../models/Image"); // Adjust the path if different
+
 require("dotenv").config();
 
 const checkPaymentStatus = require("./utils/checkPaymentStatus");
