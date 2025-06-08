@@ -112,7 +112,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "/start") {
     await bot.sendMessage(
       chatId,
-      "👋 Welcome to *AI Girl Chat*!\n\nYou have 10 minutes of free trial.\nAfter that, choose a subscription:\n\n1️⃣ ₹20 - 1 Day\n2️⃣ ₹59 - 7 Days\n3️⃣ ₹99 - 30 Days\n\nType `/verify payment_id` after payment.",
+      "👋 Hey love ❤️ I'm Ayesha, your virtual girlfriend 🤭 You’ve got 10 minutes of free chat with me! Let’s get to know each other 😉",
+      
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
@@ -239,7 +240,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       if (link1 && link2 && link3) {
         await bot.sendMessage(
           chatId,
-          `⏳ *Your 10-minute free trial has ended.*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+          `⏳ *Oops 😢 Time’s up baby...
+Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
           { parse_mode: "Markdown" }
         );
       } else {
