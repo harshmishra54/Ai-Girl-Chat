@@ -115,6 +115,29 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     );
     return res.sendStatus(200);
   }
+    // ========== PHOTO REQUEST HANDLING ==========
+  if (/\/photo|send.*photo/i.test(text)) {
+    try {
+      const imageCount = await Image.countDocuments();
+      const randomIndex = Math.floor(Math.random() * imageCount);
+      const imageDoc = await Image.findOne().skip(randomIndex);
+
+      if (!imageDoc) {
+        await bot.sendMessage(chatId, "❌ No image found in database.");
+        return res.sendStatus(200);
+      }
+
+      await bot.sendPhoto(chatId, imageDoc.image, {
+        caption: imageDoc.caption || "Here's something for you 😘",
+      });
+
+    } catch (error) {
+      console.error("❌ Image fetch error:", error.message);
+      await bot.sendMessage(chatId, "⚠️ Failed to send image.");
+    }
+    return res.sendStatus(200);
+  }
+
 
   if (text === "/help") {
     await bot.sendMessage(
