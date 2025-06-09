@@ -52,8 +52,9 @@ async function sendRealChat(bot, chatId, fullText) {
 
   for (const chunk of chunks) {
     await bot.sendChatAction(chatId, 'typing');
-    await delay(1000 + Math.random() * 1200);
     await bot.sendMessage(chatId, chunk);
+    await delay(800 + Math.random() * 1200);
+    
   }
 }
 
@@ -120,11 +121,12 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
 
 // ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
+ res.sendStatus(200); 
   const update = req.body;
   const chatId = update.message?.chat?.id;
   const text = update.message?.text;
 
-  if (!chatId || !text) return res.sendStatus(200);
+  if (!chatId || !text) return;
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
@@ -332,6 +334,11 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
 
       return res.sendStatus(200);
     }
+  }
+   const already = await MessageLog.findOne({ telegramId: chatId, message: text });
+  if (already) {
+    console.log("⚠ Duplicate message, skipping.");
+    return;
   }
 
   // ========== AI CHAT ==========
