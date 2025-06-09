@@ -15,7 +15,9 @@ const generateTTS = async (text) => {
       url,
       {
         text,
-        model_id: "eleven_monolingual_v1", // or "eleven_monolingual_v2" if supported
+        model_id: "eleven_multilingual_v2",
+
+        // or "eleven_monolingual_v2" if supported
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.7,
