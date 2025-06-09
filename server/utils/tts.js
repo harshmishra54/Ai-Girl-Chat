@@ -1,15 +1,14 @@
-// utils/generateTTS.js
 const axios = require("axios");
 require("dotenv").config();
 
 const generateTTS = async (text) => {
   const apiKey = process.env.ELEVENLABS_API_KEY;
-   console.log("ELEVENLABS_API_KEY:", apiKey);
 
-  // Use the actual voice_id string here, e.g., Aria's voice ID from /v1/voices
-  const voiceId = "9BWtsMINqrJLrRacOk9x"; // Replace with the voice ID you want to use
+  // ✅ Log once to make sure key is being loaded
+  console.log("ELEVENLABS_API_KEY:", apiKey);
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const voiceId = "9BWtsMINqrJLrRacOk9x"; // Change to your actual voice ID
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`;
 
   try {
     const response = await axios.post(
@@ -17,8 +16,6 @@ const generateTTS = async (text) => {
       {
         text,
         model_id: "eleven_multilingual_v2",
-
-        // or "eleven_monolingual_v2" if supported
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.7,
@@ -36,7 +33,7 @@ const generateTTS = async (text) => {
       }
     );
 
-    return response.data; // This is the audio stream
+    return response.data; // audio stream
   } catch (error) {
     console.error("Voice generation error:", error.response?.data || error.message);
     throw error;
