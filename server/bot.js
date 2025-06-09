@@ -3,6 +3,8 @@ const axios = require("axios");
 const express = require("express");
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
+const generateTTS = require('./utils/tts');
+const convertMp3ToOgg = require('./utils/convertAudio');
 const crypto = require("crypto");
 const Image = require("./models/Image"); // Adjust the path if different
 
@@ -347,6 +349,32 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
     });
 
     await bot.sendMessage(chatId, aiReply);
+    // Now handle voice
+  const tempDir = path.join(__dirname, 'temp');
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+  const ttsUrl = await generateTTS(aiReply);
+
+  const mp3Path = path.join(tempDir, `${chatId}.mp3`);
+  const oggPath = path.join(tempDir, `${chatId}.ogg`);
+
+  const writer = fs.createWriteStream(mp3Path);
+  const audioRes = await axios({ url: ttsUrl, responseType: 'stream' });
+  audioRes.data.pipe(writer);
+
+  await new Promise((resolve, reject) => {
+    writer.on('finish', resolve);
+    writer.on('error', reject);
+  });
+
+  await convertMp3ToOgg(mp3Path, oggPath);
+
+  await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
+    caption: aiReply,
+  });
+
+  fs.unlinkSync(mp3Path);
+  fs.unlinkSync(oggPath);
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
