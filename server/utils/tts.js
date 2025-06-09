@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const generateTTS = async (text) => {
   const apiKey = process.env.ELEVENLABS_API_KEY;
+   console.log("ELEVENLABS_API_KEY:", apiKey);
 
   // Use the actual voice_id string here, e.g., Aria's voice ID from /v1/voices
   const voiceId = "9BWtsMINqrJLrRacOk9x"; // Replace with the voice ID you want to use
