@@ -351,32 +351,36 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       timestamp: new Date(),
     });
 
-    // await bot.sendMessage(chatId, aiReply);
-
-const tempDir = path.join(__dirname, "temp");
+    await bot.sendMessage(chatId, aiReply);
+    const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
 try {
-  // Save MP3 from text
-  const mp3Path = await generateTTS(aiReply, chatId);
+  // 1. Generate MP3 file path by saving TTS audio for aiReply text
+  const mp3Path = await generateTTS(aiReply, chatId); // should save mp3 and return mp3Path
+
+  // 2. Prepare OGG file path for Telegram voice format
   const oggPath = path.join(tempDir, `${chatId}.ogg`);
 
-  // Convert to OGG
+  // 3. Convert the saved MP3 to OGG format
   await convertMp3ToOgg(mp3Path, oggPath);
 
-  // Send both text and voice
-  await bot.sendMessage(chatId, aiReply); // ✅ Send text
+  // 4. Send the AI reply text once
+  await bot.sendMessage(chatId, aiReply);
+
+  // 5. Send the OGG voice message with optional caption
   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
     caption: "Here's my voice 😉",
   });
 
-  // Cleanup
+  // 6. Cleanup temporary files
   fs.unlinkSync(mp3Path);
   fs.unlinkSync(oggPath);
 } catch (err) {
   console.error("Voice generation error:", err);
   await bot.sendMessage(chatId, "Something went wrong with voice output.");
 }
+
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
