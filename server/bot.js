@@ -351,7 +351,7 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       timestamp: new Date(),
     });
 
-    // await bot.sendMessage(chatId, aiReply);
+    await bot.sendMessage(chatId, aiReply);
     const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
@@ -366,7 +366,7 @@ try {
   await convertMp3ToOgg(mp3Path, oggPath);
 
   // 4. Send the AI reply text once
-  await bot.sendMessage(chatId, aiReply);
+  // await bot.sendMessage(chatId, aiReply);
 
   // 5. Send the OGG voice message with optional caption
   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
