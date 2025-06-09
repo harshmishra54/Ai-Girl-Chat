@@ -351,7 +351,7 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       timestamp: new Date(),
     });
 
-    await bot.sendMessage(chatId, aiReply);
+    // await bot.sendMessage(chatId, aiReply);
 
 const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
