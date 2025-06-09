@@ -21,10 +21,42 @@ const APP_URL = process.env.APP_URL;
 const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 const MONGO_URI = process.env.MONGO_URI;
 
+
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+// ========== CHUNKED & TYPED MESSAGE RESPONSE ==========
+function splitIntoChunks(text, maxLength = 180) {
+  const sentences = text.split(/(?<=[.?!])\s+/);
+  const chunks = [];
+  let currentChunk = '';
+
+  for (let sentence of sentences) {
+    if ((currentChunk + sentence).length <= maxLength) {
+      currentChunk += sentence + ' ';
+    } else {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence + ' ';
+    }
+  }
+
+  if (currentChunk) chunks.push(currentChunk.trim());
+  return chunks;
+}
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+async function sendRealChat(bot, chatId, fullText) {
+  const chunks = splitIntoChunks(fullText, 180);
+
+  for (const chunk of chunks) {
+    await bot.sendChatAction(chatId, 'typing');
+    await delay(1000 + Math.random() * 1200);
+    await bot.sendMessage(chatId, chunk);
+  }
+}
+
 
 const bot = APP_URL
   ? new TelegramBot(BOT_TOKEN)
@@ -351,7 +383,9 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       timestamp: new Date(),
     });
 
-    await bot.sendMessage(chatId, aiReply);
+    // await bot.sendMessage(chatId, aiReply);
+    await sendRealChat(bot, chatId, aiReply);
+
     const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
