@@ -1,13 +1,14 @@
-const gTTS = require('gtts');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
+const gTTS = require("gtts");
 
-const generateTTS = (text, filename) => {
+const generateTTS = async (text, chatId) => {
   return new Promise((resolve, reject) => {
-    const gtts = new gTTS(text, 'en');
-    const filepath = path.join(__dirname, 'temp', filename);
-    gtts.save(filepath, (err) => {
-      if (err) reject(err);
-      else resolve(filepath);
+    const filePath = path.join(__dirname, "../temp", `${chatId}.mp3`);
+    const gtts = new gTTS(text, "en");
+    gtts.save(filePath, function (err) {
+      if (err) return reject(err);
+      resolve(filePath);
     });
   });
 };
