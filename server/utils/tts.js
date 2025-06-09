@@ -1,14 +1,15 @@
-const axios = require("axios");
+const gTTS = require('gtts');
+const path = require('path');
 
-const generateTTS = async (text) => {
-  const response = await axios.post(
-    "https://api.ttsmaker.com/generate", // You can replace with your actual TTS API
-    {
-      text: text,
-      voice: "en-US_AllisonV3Voice", // Choose the voice if API supports
-    }
-  );
-  return response.data.audioUrl;
+const generateTTS = (text, filename) => {
+  return new Promise((resolve, reject) => {
+    const gtts = new gTTS(text, 'en');
+    const filepath = path.join(__dirname, 'temp', filename);
+    gtts.save(filepath, (err) => {
+      if (err) reject(err);
+      else resolve(filepath);
+    });
+  });
 };
 
 module.exports = generateTTS;
