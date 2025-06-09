@@ -352,32 +352,31 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
     });
 
     await bot.sendMessage(chatId, aiReply);
-    // Now handle voice
-  const tempDir = path.join(__dirname, 'temp');
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  const ttsUrl = await generateTTS(aiReply);
+const tempDir = path.join(__dirname, "temp");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  const mp3Path = path.join(tempDir, `${chatId}.mp3`);
+try {
+  // Save MP3 from text
+  const mp3Path = await generateTTS(aiReply, chatId);
   const oggPath = path.join(tempDir, `${chatId}.ogg`);
 
-  const writer = fs.createWriteStream(mp3Path);
-  const audioRes = await axios({ url: ttsUrl, responseType: 'stream' });
-  audioRes.data.pipe(writer);
-
-  await new Promise((resolve, reject) => {
-    writer.on('finish', resolve);
-    writer.on('error', reject);
-  });
-
+  // Convert to OGG
   await convertMp3ToOgg(mp3Path, oggPath);
 
+  // Send both text and voice
+  await bot.sendMessage(chatId, aiReply); // ✅ Send text
   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
-    caption: aiReply,
+    caption: "Here's my voice 😉",
   });
 
+  // Cleanup
   fs.unlinkSync(mp3Path);
   fs.unlinkSync(oggPath);
+} catch (err) {
+  console.error("Voice generation error:", err);
+  await bot.sendMessage(chatId, "Something went wrong with voice output.");
+}
   } catch (error) {
     console.error("Bot error:", error.response?.data || error.message);
     await bot.sendMessage(
