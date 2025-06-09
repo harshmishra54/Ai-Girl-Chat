@@ -335,11 +335,7 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       return res.sendStatus(200);
     }
   }
-   const already = await MessageLog.findOne({ telegramId: chatId, message: text });
-  if (already) {
-    console.log("⚠ Duplicate message, skipping.");
-    return;
-  }
+  
 
   // ========== AI CHAT ==========
   try {
