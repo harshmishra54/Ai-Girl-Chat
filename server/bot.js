@@ -3,7 +3,7 @@ const axios = require("axios");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-
+const translateToRomanHindi = require("./utils/translateWithNSFW");
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const generateTTS = require('./utils/tts');
@@ -127,6 +127,11 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const text = update.message?.text;
 
   if (!chatId || !text) return;
+  const translatedText = await translateToRomanHindi(text);
+  await bot.sendMessage(chatId, `🈳 *Translated Message:*\n${translatedText}`, {
+    parse_mode: "Markdown",
+  });
+
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
@@ -354,7 +359,9 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
     }
 
-    conversationContext += `User: ${text}\nAI:`;
+    // conversationContext += `User: ${text}\nAI:`;
+    conversationContext += `User: ${translatedText}\nAI:`;
+
 
     const sendMessageToApi = async (message, retries = 1) => {
       try {
