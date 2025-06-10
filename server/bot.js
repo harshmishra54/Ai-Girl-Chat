@@ -26,37 +26,6 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
-// ========== CHUNKED & TYPED MESSAGE RESPONSE ==========
-function splitIntoChunks(text, maxLength = 180) {
-  const sentences = text.split(/(?<=[.?!])\s+/);
-  const chunks = [];
-  let currentChunk = '';
-
-  for (let sentence of sentences) {
-    if ((currentChunk + sentence).length <= maxLength) {
-      currentChunk += sentence + ' ';
-    } else {
-      chunks.push(currentChunk.trim());
-      currentChunk = sentence + ' ';
-    }
-  }
-
-  if (currentChunk) chunks.push(currentChunk.trim());
-  return chunks;
-}
-
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function sendRealChat(bot, chatId, fullText) {
-  const chunks = splitIntoChunks(fullText, 180);
-
-  for (const chunk of chunks) {
-    await bot.sendChatAction(chatId, 'typing');
-    await bot.sendMessage(chatId, chunk);
-    await delay(800 + Math.random() * 1200);
-    
-  }
-}
 
 
 const bot = APP_URL
@@ -121,12 +90,11 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
 
 // ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
- res.sendStatus(200); 
   const update = req.body;
   const chatId = update.message?.chat?.id;
   const text = update.message?.text;
 
-  if (!chatId || !text) return;
+  if (!chatId || !text) return res.sendStatus(200);
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
@@ -335,7 +303,6 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       return res.sendStatus(200);
     }
   }
-  
 
   // ========== AI CHAT ==========
   try {
@@ -386,9 +353,7 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
       timestamp: new Date(),
     });
 
-    // await bot.sendMessage(chatId, aiReply);
-    await sendRealChat(bot, chatId, aiReply);
-
+    await bot.sendMessage(chatId, aiReply);
     const tempDir = path.join(__dirname, "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
