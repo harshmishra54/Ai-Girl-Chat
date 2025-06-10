@@ -3,7 +3,7 @@ const axios = require("axios");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const translateToRomanHindi = require("./utils/translateWithNSFW");
+
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const generateTTS = require('./utils/tts');
@@ -127,11 +127,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const text = update.message?.text;
 
   if (!chatId || !text) return;
-  const translatedText = await translateToRomanHindi(text);
-  await bot.sendMessage(chatId, `🈳 *Translated Message:*\n${translatedText}`, {
-    parse_mode: "Markdown",
-  });
-
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
@@ -342,93 +337,98 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
   }
   
 
-try {
-  await bot.sendChatAction(chatId, "typing");
-
-  // === Step 1: Translate user input (Hindi to English)
-  const cleanEnglish = await translateWithNSFW(text, "hi2en");
-
-  // === Step 2: Fetch last 6 messages for context
-  let lastMessages = await MessageLog.find({ telegramId: chatId })
-    .sort({ timestamp: -1 })
-    .limit(6)
-    .lean();
-
-  lastMessages = lastMessages.reverse();
-
-  let conversationContext = "";
-  for (const msg of lastMessages) {
-    conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
-  }
-
-  conversationContext += `User: ${cleanEnglish}\nAI:`;
-
-  // === Step 3: Send to AI API
-  const sendMessageToApi = async (message, retries = 1) => {
-    try {
-      const response = await axios.post(
-        API_URL,
-        { message },
-        {
-          headers: {
-            "x-api-key": BOT_API_KEY,
-          },
-        }
-      );
-      return response.data.reply || "Sorry, I didn't get that.";
-    } catch (error) {
-      if (retries > 0) {
-        await new Promise((r) => setTimeout(r, 2000));
-        return sendMessageToApi(message, retries - 1);
-      }
-      throw error;
-    }
-  };
-
-  const aiReplyEnglish = await sendMessageToApi(conversationContext);
-
-  // === Step 4: Translate AI reply back to Roman Hindi
-  const aiReplyRoman = await translateWithNSFW(aiReplyEnglish, "en2hn");
-
-  // === Step 5: Save chat history
-  await MessageLog.create({
-    telegramId: chatId,
-    message: cleanEnglish,
-    response: aiReplyEnglish,
-    timestamp: new Date(),
-  });
-
-  // === Step 6: Send AI reply (Roman Hindi)
-  await sendRealChat(bot, chatId, aiReplyRoman);
-
-  // === Step 7: Text-to-Speech and Voice Message
-  const tempDir = path.join(__dirname, "temp");
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
+  // ========== AI CHAT ==========
   try {
-    const mp3Path = await generateTTS(aiReplyRoman, chatId);
-    const oggPath = path.join(tempDir, `${chatId}.ogg`);
+    await bot.sendChatAction(chatId, "typing");
 
-    await convertMp3ToOgg(mp3Path, oggPath);
+    // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
+    let lastMessages = await MessageLog.find({ telegramId: chatId })
+      .sort({ timestamp: -1 })
+      .limit(6)
+      .lean();
 
-    await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
-      caption: "Here's my voice 😉",
+    lastMessages = lastMessages.reverse();
+
+    let conversationContext = "";
+    for (const msg of lastMessages) {
+      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+    }
+
+    conversationContext += `User: ${text}\nAI:`;
+
+    const sendMessageToApi = async (message, retries = 1) => {
+      try {
+        const response = await axios.post(
+          API_URL,
+          { message },
+          {
+            headers: {
+              "x-api-key": BOT_API_KEY,
+            },
+          }
+        );
+        return response.data.reply || "Sorry, I didn't get that.";
+      } catch (error) {
+        if (retries > 0) {
+          await new Promise((r) => setTimeout(r, 2000));
+          return sendMessageToApi(message, retries - 1);
+        }
+        throw error;
+      }
+    };
+
+    const aiReply = await sendMessageToApi(conversationContext);
+
+    await MessageLog.create({
+      telegramId: chatId,
+      message: text,
+      response: aiReply,
+      timestamp: new Date(),
     });
 
-    fs.unlinkSync(mp3Path);
-    fs.unlinkSync(oggPath);
-  } catch (err) {
-    console.error("Voice generation error:", err);
-    await bot.sendMessage(chatId, "Something went wrong with voice output.");
-  }
+    // await bot.sendMessage(chatId, aiReply);
+    await sendRealChat(bot, chatId, aiReply);
 
-} catch (error) {
-  console.error("Bot error:", error.response?.data || error.message);
-  await bot.sendMessage(chatId, "⚠️ Something went wrong. Please try again later.");
+    const tempDir = path.join(__dirname, "temp");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+try {
+  // 1. Generate MP3 file path by saving TTS audio for aiReply text
+  const mp3Path = await generateTTS(aiReply, chatId); // should save mp3 and return mp3Path
+
+  // 2. Prepare OGG file path for Telegram voice format
+  const oggPath = path.join(tempDir, `${chatId}.ogg`);
+
+  // 3. Convert the saved MP3 to OGG format
+  await convertMp3ToOgg(mp3Path, oggPath);
+
+  // 4. Send the AI reply text once
+  // await bot.sendMessage(chatId, aiReply);
+
+  // 5. Send the OGG voice message with optional caption
+  await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
+    caption: "Here's my voice 😉",
+  });
+
+  // 6. Cleanup temporary files
+  fs.unlinkSync(mp3Path);
+  fs.unlinkSync(oggPath);
+} catch (err) {
+  console.error("Voice generation error:", err);
+  await bot.sendMessage(chatId, "Something went wrong with voice output.");
 }
 
-res.sendStatus(200);
+  } catch (error) {
+    console.error("Bot error:", error.response?.data || error.message);
+    await bot.sendMessage(
+      chatId,
+      "⚠️ Something went wrong. Please try again later."
+    );
+  }
+
+  res.sendStatus(200);
 });
+
 // ================= RAZORPAY WEBHOOK =================
 // ======== RAZORPAY WEBHOOK =========
 app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
