@@ -162,7 +162,8 @@ const badWords = {
   "shaft": "lund ki danda",
 };
 function isNSFW(text) {
-  return badWords.some(word => text.toLowerCase().includes(word));
+  const lowerText = text.toLowerCase();
+  return Object.keys(badWords).some(word => lowerText.includes(word));
 }
 
 module.exports = isNSFW;
