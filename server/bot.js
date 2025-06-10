@@ -3,9 +3,7 @@ const axios = require("axios");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const sendRealChat = require("./utils/sendRealChat");
-const isNSFW = require("./utils/isNSFW");
-const nsfwReplies = require("./nsfw/replies");
+
 
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
@@ -98,14 +96,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const text = update.message?.text;
 
   if (!chatId || !text) return res.sendStatus(200);
-  
-// NSFW check added here
-if (isNSFW(text)) {
-  const randomIndex = Math.floor(Math.random() * nsfwReplies.length);
-  const replyText = nsfwReplies[randomIndex];
-  await bot.sendMessage(chatId, replyText);
-  return res.sendStatus(200);  // stop further processing
-}
 
   let user = await User.findOne({ telegramId: chatId });
   let isNewUser = false;
