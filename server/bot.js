@@ -3,7 +3,7 @@ const axios = require("axios");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-
+const cron = require("node-cron");
 
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
@@ -21,55 +21,6 @@ const BOT_API_KEY = process.env.BOT_API_KEY;
 const APP_URL = process.env.APP_URL;
 const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 const MONGO_URI = process.env.MONGO_URI;
-// function getMillisecondsUntil7PMIST() {
-//   const now = new Date();
-//   const currentISTOffset = 5.5 * 60 * 60 * 1000;
-//   const utcNow = now.getTime() + now.getTimezoneOffset() * 60000;
-//   const istNow = new Date(utcNow + currentISTOffset);
-
-//   const next7PM = new Date(istNow);
-//   next7PM.setHours(19, 0, 0, 0); // 7 PM IST
-
-//   if (istNow >= next7PM) {
-//     next7PM.setDate(next7PM.getDate() + 1); // Schedule for tomorrow
-//   }
-
-//   return next7PM.getTime() - istNow.getTime();
-// }
-function getMillisecondsUntil850AMIST() {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const utcNow = now.getTime() + now.getTimezoneOffset() * 60000;
-  const istNow = new Date(utcNow + istOffset);
-
-  const next850AM = new Date(istNow);
-  next850AM.setHours(8, 50, 0, 0); // 8:50 AM IST
-
-  if (istNow >= next850AM) {
-    next850AM.setDate(next850AM.getDate() + 1);
-  }
-
-  return next850AM.getTime() - istNow.getTime();
-}
-
-async function sendDailyImageToAllUsers(bot) {
-  try {
-    const users = await User.find({});
-    if (!dailyImage) await updateDailyImage();
-
-    for (const user of users) {
-      if (dailyImage) {
-        await bot.sendPhoto(user.telegramId, dailyImage.image, {
-          caption: dailyImage.caption || "Here's your 7 PM surprise ❤️",
-        });
-      }
-    }
-
-    console.log(`✅ Sent daily image to ${users.length} users at 7 PM IST.`);
-  } catch (error) {
-    console.error("❌ Error sending daily image at 7 PM:", error.message);
-  }
-}
 
 
 const razorpay = new Razorpay({
@@ -469,41 +420,50 @@ app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
 // ================= START SERVER Deployment =================
 mongoose
   .connect(MONGO_URI)
-  .then(async () => {
-    console.log("✅ MongoDB connected");
+  .then(() => {
+    console.log("MongoDB connected");
     const PORT = process.env.PORT || 8080;
 
-    // Start server
     if (APP_URL) {
       app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`Server running on port ${PORT}`);
       });
 
       const url = `${APP_URL}/bot${BOT_TOKEN}`;
       bot.setWebHook(url).then(() => {
-        console.log(`✅ Webhook set: ${url}`);
+        console.log(`Webhook set: ${url}`);
       });
     } else {
-      console.log("⚡ Polling mode active");
+      console.log("Polling mode active");
+    }
+  })
+  .catch((err) => console.error("MongoDB error:", err));
+
+
+// Scheduler: Run every day at 7 PM IST (Asia/Kolkata)
+cron.schedule("7 9 * * *", async () => {
+  try {
+    const users = await User.find({});
+    const imageCount = await Image.countDocuments();
+
+    if (imageCount === 0 || users.length === 0) {
+      console.log("⛔ No users or no images found.");
+      return;
     }
 
-    // ========== 💌 Daily 7 PM Scheduler ==========
-    // Fetch the first daily image
-    await updateDailyImage();
+    const randomIndex = Math.floor(Math.random() * imageCount);
+    const imageDoc = await Image.findOne().skip(randomIndex);
 
-    // const firstDelay = getMillisecondsUntil7PMIST();
-    const firstDelay = getMillisecondsUntil850AMIST(); // for testing
+    for (const user of users) {
+      await bot.sendPhoto(user.telegramId, imageDoc.image, {
+        caption: imageDoc.caption || "Here's something special for you 😘",
+      });
+    }
 
-    console.log(`🕖 7 PM IST message in ${Math.round(firstDelay / 60000)} minutes`);
-
-    setTimeout(() => {
-      sendDailyImageToAllUsers(bot);
-
-      // Repeat every 24 hours
-      setInterval(async () => {
-        await updateDailyImage(); // Load next image
-        sendDailyImageToAllUsers(bot);
-      }, 24 * 60 * 60 * 1000);
-    }, firstDelay);
-  })
-  .catch((err) => console.error("❌ MongoDB error:", err));
+    console.log(`✅ 7PM image sent to ${users.length} users.`);
+  } catch (err) {
+    console.error("❌ Scheduler error:", err.message);
+  }
+}, {
+  timezone: "Asia/Kolkata"
+});
