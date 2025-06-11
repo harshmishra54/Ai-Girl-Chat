@@ -92,6 +92,46 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
 // ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
+  if (update.callback_query) {
+    const chatId = update.callback_query.message.chat.id;
+    await bot.answerCallbackQuery(update.callback_query.id);
+
+    const user = await User.findOne({ telegramId: chatId });
+    const now = new Date();
+    let allowed = user && user.telegramId === "5405202126"; // owner
+
+    if (user?.paymentVerified && user.paymentVerifiedAt) {
+      const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
+      if (
+        (user.paymentAmount === 20 && diffH <= 24) ||
+        (user.paymentAmount === 59 && diffH <= 168) ||
+        (user.paymentAmount === 99 && diffH <= 720)
+      ) allowed = true;
+    }
+    if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
+      allowed = true;
+    }
+
+    if (!allowed) {
+      const link1 = await createPaymentLink(chatId, 20, "1 Day");
+      const link2 = await createPaymentLink(chatId, 59, "7 Days");
+      const link3 = await createPaymentLink(chatId, 99, "30 Days");
+      await bot.sendMessage(chatId, `💋Want to Unlock my photos: 1‑day ₹20 ${link1}\n7‑day ₹59 ${link2}\n30‑day ₹99 ${link3}\nThen use /verify`);
+      return res.sendStatus(200);
+    }
+
+    const imageCount = await Image.countDocuments();
+    if (imageCount === 0) {
+      await bot.sendMessage(chatId, "❌ No photos to show right now.");
+      return res.sendStatus(200);
+    }
+    const rand = Math.floor(Math.random() * imageCount);
+    const doc = await Image.findOne().skip(rand);
+    await bot.sendPhoto(chatId, doc.image, { caption: doc.caption || "😘" });
+    return res.sendStatus(200);
+  }
+
+
   const chatId = update.message?.chat?.id;
   const text = update.message?.text;
 
@@ -132,61 +172,6 @@ if (text === "/start") {
     }
   );
   return res.sendStatus(200);
-}
-// ========== HANDLE INLINE BUTTON ACTION ==========
-if (update.callback_query) {
-  const chatId = update.callback_query.message.chat.id;
-  const data = update.callback_query.data;
-
-  if (data === "get_photo") {
-    let user = await User.findOne({ telegramId: chatId });
-    const now = new Date();
-
-    // check if allowed
-    let allowed = false;
-    if (user?.telegramId === "5405202126") allowed = true;
-
-    if (user?.paymentVerified && user?.paymentVerifiedAt) {
-      const diff = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
-      if (
-        (user.paymentAmount === 20 && diff <= 24) ||
-        (user.paymentAmount === 59 && diff <= 168) ||
-        (user.paymentAmount === 99 && diff <= 720)
-      ) allowed = true;
-    }
-
-    if (!user?.paymentVerified) {
-      const trialMins = (now - new Date(user.freeChatStart)) / 60000;
-      if (trialMins <= 10) allowed = true;
-    }
-
-    if (!allowed) {
-      const link1 = await createPaymentLink(chatId, 20, "1 Day");
-      const link2 = await createPaymentLink(chatId, 59, "7 Days");
-      const link3 = await createPaymentLink(chatId, 99, "30 Days");
-
-      await bot.sendMessage(
-        chatId,
-        `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
-        { parse_mode: "Markdown" }
-      );
-      return res.sendStatus(200);
-    }
-
-    const imageCount = await Image.countDocuments();
-    const randomIndex = Math.floor(Math.random() * imageCount);
-    const imageDoc = await Image.findOne().skip(randomIndex);
-
-    if (!imageDoc) {
-      await bot.sendMessage(chatId, "❌ No image found in database.");
-    } else {
-      await bot.sendPhoto(chatId, imageDoc.image, {
-        caption: imageDoc.caption || "Here's something for you 😘",
-      });
-    }
-
-    return res.sendStatus(200);
-  }
 }
 
 
