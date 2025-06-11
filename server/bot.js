@@ -116,47 +116,48 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   const now = new Date();
   const isOwner = user.telegramId === "5405202126";
+if (text === "/start") {
+  await bot.sendMessage(
+    chatId,
+    "👋 Hey love ❤️ I'm Ayesha, your virtual girlfriend 🤭 You’ve got 10 minutes of free chat with me! Let’s get to know each other 😉\n\n🔻 Want a surprise photo? Just tap the button below 👇",
+    {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📸 Send Me a Photo", callback_data: "get_photo" }
+          ]
+        ]
+      }
+    }
+  );
+  return res.sendStatus(200);
+}
+// ========== HANDLE INLINE BUTTON ACTION ==========
+if (update.callback_query) {
+  const chatId = update.callback_query.message.chat.id;
+  const data = update.callback_query.data;
 
-  if (text === "/start") {
-    await bot.sendMessage(
-      chatId,
-      "👋 Hey love ❤️ I'm Ayesha, your virtual girlfriend 🤭 You’ve got 10 minutes of free chat with me! Let’s get to know each other 😉",
-      { parse_mode: "Markdown" }
-    );
-    return res.sendStatus(200);
-  }
-
-  if (/\/photo|send.*photo/i.test(text)) {
-  try {
+  if (data === "get_photo") {
+    let user = await User.findOne({ telegramId: chatId });
     const now = new Date();
-    const isOwner = user.telegramId === "5405202126";
+
+    // check if allowed
     let allowed = false;
+    if (user?.telegramId === "5405202126") allowed = true;
 
-    // 1. Owner always allowed
-    if (isOwner) {
-      allowed = true;
-    }
-
-    // 2. If payment is active
-    if (user.paymentVerified && user.paymentVerifiedAt) {
-      const verifiedAt = new Date(user.paymentVerifiedAt);
-      const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
-
+    if (user?.paymentVerified && user?.paymentVerifiedAt) {
+      const diff = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
       if (
-        (user.paymentAmount === 20 && diffHours <= 24) ||
-        (user.paymentAmount === 59 && diffHours <= 168) ||
-        (user.paymentAmount === 99 && diffHours <= 720)
-      ) {
-        allowed = true;
-      }
+        (user.paymentAmount === 20 && diff <= 24) ||
+        (user.paymentAmount === 59 && diff <= 168) ||
+        (user.paymentAmount === 99 && diff <= 720)
+      ) allowed = true;
     }
 
-    // 3. If still within trial
-    if (!user.paymentVerified) {
+    if (!user?.paymentVerified) {
       const trialMins = (now - new Date(user.freeChatStart)) / 60000;
-      if (trialMins <= 10) {
-        allowed = true;
-      }
+      if (trialMins <= 10) allowed = true;
     }
 
     if (!allowed) {
@@ -172,25 +173,20 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // If allowed, send random photo
     const imageCount = await Image.countDocuments();
     const randomIndex = Math.floor(Math.random() * imageCount);
     const imageDoc = await Image.findOne().skip(randomIndex);
 
     if (!imageDoc) {
       await bot.sendMessage(chatId, "❌ No image found in database.");
-      return res.sendStatus(200);
+    } else {
+      await bot.sendPhoto(chatId, imageDoc.image, {
+        caption: imageDoc.caption || "Here's something for you 😘",
+      });
     }
 
-    await bot.sendPhoto(chatId, imageDoc.image, {
-      caption: imageDoc.caption || "Here's something for you 😘",
-    });
-
-  } catch (error) {
-    console.error("❌ Image fetch error:", error.message);
-    await bot.sendMessage(chatId, "⚠️ Failed to send image.");
+    return res.sendStatus(200);
   }
-  return res.sendStatus(200);
 }
 
 
