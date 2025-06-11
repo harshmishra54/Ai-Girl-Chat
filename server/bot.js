@@ -126,28 +126,73 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  // ========== PHOTO REQUEST HANDLING ==========
   if (/\/photo|send.*photo/i.test(text)) {
-    try {
-      const imageCount = await Image.countDocuments();
-      const randomIndex = Math.floor(Math.random() * imageCount);
-      const imageDoc = await Image.findOne().skip(randomIndex);
+  try {
+    const now = new Date();
+    const isOwner = user.telegramId === "5405202126";
+    let allowed = false;
 
-      if (!imageDoc) {
-        await bot.sendMessage(chatId, "❌ No image found in database.");
-        return res.sendStatus(200);
-      }
-
-      await bot.sendPhoto(chatId, imageDoc.image, {
-        caption: imageDoc.caption || "Here's something for you 😘",
-      });
-
-    } catch (error) {
-      console.error("❌ Image fetch error:", error.message);
-      await bot.sendMessage(chatId, "⚠️ Failed to send image.");
+    // 1. Owner always allowed
+    if (isOwner) {
+      allowed = true;
     }
-    return res.sendStatus(200);
+
+    // 2. If payment is active
+    if (user.paymentVerified && user.paymentVerifiedAt) {
+      const verifiedAt = new Date(user.paymentVerifiedAt);
+      const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
+
+      if (
+        (user.paymentAmount === 20 && diffHours <= 24) ||
+        (user.paymentAmount === 59 && diffHours <= 168) ||
+        (user.paymentAmount === 99 && diffHours <= 720)
+      ) {
+        allowed = true;
+      }
+    }
+
+    // 3. If still within trial
+    if (!user.paymentVerified) {
+      const trialMins = (now - new Date(user.freeChatStart)) / 60000;
+      if (trialMins <= 10) {
+        allowed = true;
+      }
+    }
+
+    if (!allowed) {
+      const link1 = await createPaymentLink(chatId, 20, "1 Day");
+      const link2 = await createPaymentLink(chatId, 59, "7 Days");
+      const link3 = await createPaymentLink(chatId, 99, "30 Days");
+
+      await bot.sendMessage(
+        chatId,
+        `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+        { parse_mode: "Markdown" }
+      );
+      return res.sendStatus(200);
+    }
+
+    // If allowed, send random photo
+    const imageCount = await Image.countDocuments();
+    const randomIndex = Math.floor(Math.random() * imageCount);
+    const imageDoc = await Image.findOne().skip(randomIndex);
+
+    if (!imageDoc) {
+      await bot.sendMessage(chatId, "❌ No image found in database.");
+      return res.sendStatus(200);
+    }
+
+    await bot.sendPhoto(chatId, imageDoc.image, {
+      caption: imageDoc.caption || "Here's something for you 😘",
+    });
+
+  } catch (error) {
+    console.error("❌ Image fetch error:", error.message);
+    await bot.sendMessage(chatId, "⚠️ Failed to send image.");
   }
+  return res.sendStatus(200);
+}
+
 
   if (text === "/help") {
     await bot.sendMessage(
