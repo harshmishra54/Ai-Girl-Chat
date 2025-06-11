@@ -161,7 +161,7 @@ if (text === "📸 Send me a Photo" || text === "/photo") {
     const link1 = await createPaymentLink(chatId, 20, "1 Day");
     const link2 = await createPaymentLink(chatId, 59, "7 Days");
     const link3 = await createPaymentLink(chatId, 99, "30 Days");
-    await bot.sendMessage(chatId, `💋 Unlock my photos: 1‑day ₹20 ${link1}\n7‑day ₹59 ${link2}\n30‑day ₹99 ${link3}\nThen use /verify`);
+    await bot.sendMessage(chatId, `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`);
     return res.sendStatus(200);
   }
 
