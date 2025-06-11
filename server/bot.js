@@ -32,6 +32,13 @@ const razorpay = new Razorpay({
 const bot = APP_URL
   ? new TelegramBot(BOT_TOKEN)
   : new TelegramBot(BOT_TOKEN, { polling: true });
+  bot.setMyCommands([
+  { command: "photo", description: "📸 Send me a random photo" },
+  { command: "start", description: "🧠 Start Chat with Ayesha" },
+  { command: "verify", description: "🔐 Verify Payment" },
+  { command: "help", description: "📖 Help & Commands" },
+]);
+
 
 const app = express();
 app.use(express.json());
@@ -92,44 +99,6 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
 // ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
-  if (update.callback_query) {
-    const chatId = update.callback_query.message.chat.id;
-    await bot.answerCallbackQuery(update.callback_query.id);
-
-    const user = await User.findOne({ telegramId: chatId });
-    const now = new Date();
-    let allowed = user && user.telegramId === "5405202126"; // owner
-
-    if (user?.paymentVerified && user.paymentVerifiedAt) {
-      const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
-      if (
-        (user.paymentAmount === 20 && diffH <= 24) ||
-        (user.paymentAmount === 59 && diffH <= 168) ||
-        (user.paymentAmount === 99 && diffH <= 720)
-      ) allowed = true;
-    }
-    if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
-      allowed = true;
-    }
-
-    if (!allowed) {
-      const link1 = await createPaymentLink(chatId, 20, "1 Day");
-      const link2 = await createPaymentLink(chatId, 59, "7 Days");
-      const link3 = await createPaymentLink(chatId, 99, "30 Days");
-      await bot.sendMessage(chatId, `💋Want to Unlock my photos: 1‑day ₹20 ${link1}\n7‑day ₹59 ${link2}\n30‑day ₹99 ${link3}\nThen use /verify`);
-      return res.sendStatus(200);
-    }
-
-    const imageCount = await Image.countDocuments();
-    if (imageCount === 0) {
-      await bot.sendMessage(chatId, "❌ No photos to show right now.");
-      return res.sendStatus(200);
-    }
-    const rand = Math.floor(Math.random() * imageCount);
-    const doc = await Image.findOne().skip(rand);
-    await bot.sendPhoto(chatId, doc.image, { caption: doc.caption || "😘" });
-    return res.sendStatus(200);
-  }
 
 
   const chatId = update.message?.chat?.id;
@@ -159,20 +128,54 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 if (text === "/start") {
   await bot.sendMessage(
     chatId,
-    "👋 Hey love ❤️ I'm Ayesha, your virtual girlfriend 🤭 You’ve got 10 minutes of free chat with me! Let’s get to know each other 😉\n\n🔻 Want a surprise photo? Just tap the button below 👇",
+    "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
     {
-      parse_mode: "Markdown",
       reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "📸 Send Me a Photo", callback_data: "get_photo" }
-          ]
-        ]
-      }
+        keyboard: [[{ text: "📸 Send me a Photo" }]],
+        resize_keyboard: true,
+        one_time_keyboard: false,
+      },
     }
   );
   return res.sendStatus(200);
 }
+if (text === "📸 Send me a Photo" || text === "/photo") {
+  const now = new Date();
+  const user = await User.findOne({ telegramId: chatId });
+
+  let allowed = user && user.telegramId === "5405202126"; // owner
+  if (user?.paymentVerified && user.paymentVerifiedAt) {
+    const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
+    if (
+      (user.paymentAmount === 20 && diffH <= 24) ||
+      (user.paymentAmount === 59 && diffH <= 168) ||
+      (user.paymentAmount === 99 && diffH <= 720)
+    ) allowed = true;
+  }
+
+  if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
+    allowed = true;
+  }
+
+  if (!allowed) {
+    const link1 = await createPaymentLink(chatId, 20, "1 Day");
+    const link2 = await createPaymentLink(chatId, 59, "7 Days");
+    const link3 = await createPaymentLink(chatId, 99, "30 Days");
+    await bot.sendMessage(chatId, `💋 Unlock my photos: 1‑day ₹20 ${link1}\n7‑day ₹59 ${link2}\n30‑day ₹99 ${link3}\nThen use /verify`);
+    return res.sendStatus(200);
+  }
+
+  const count = await Image.countDocuments();
+  if (count === 0) {
+    await bot.sendMessage(chatId, "❌ No photos to show right now.");
+    return res.sendStatus(200);
+  }
+  const random = Math.floor(Math.random() * count);
+  const imageDoc = await Image.findOne().skip(random);
+  await bot.sendPhoto(chatId, imageDoc.image, { caption: imageDoc.caption || "😘" });
+  return res.sendStatus(200);
+}
+
 
 
   if (text === "/help") {
