@@ -79,7 +79,7 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
     const paymentLink = await razorpay.paymentLink.create({
       amount: amount * 100,
       currency: "INR",
-      description: `AI Girl Chat Premium - ${durationLabel}`,
+      description: `AI Resume Builder - ${durationLabel}`,
       customer: {
         name: `Telegram User ${telegramId}`,
         email: `${telegramId}@telegram.com`,
