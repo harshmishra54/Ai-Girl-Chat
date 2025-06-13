@@ -21,6 +21,7 @@ const Header = () => {
           <Link to="/terms" onClick={toggleMenu}>Terms</Link>
           <Link to="/refund" onClick={toggleMenu}>Refund</Link>
           <Link to="/contact" onClick={toggleMenu}>Contact</Link>
+          <Link to="/payments" onClick={toggleMenu}>Payments</Link> {/* ✅ New Link */}
         </nav>
       </div>
     </header>
