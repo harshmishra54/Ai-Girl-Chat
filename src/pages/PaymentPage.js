@@ -7,7 +7,8 @@ const PaymentPage = () => {
 
   const fetchPayments = async () => {
     try {
-      const response = await fetch(`https://ai-girl-chat-2.onrender.com/api/payments/${telegramId}`);
+      const response = await fetch(`https://ai-girl-chat-2.onrender.com/api/payments/check/${telegramId}`);
+
       
       if (!response.ok) {
         throw new Error("Failed to fetch payment data.");
