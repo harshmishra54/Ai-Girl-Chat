@@ -1,68 +1,85 @@
-import React, { useEffect } from "react";
-import "./PaymentPage.css";
+import React, { useState } from "react";
 
-const BACKEND_URL = "https://ai-girl-chat-2.onrender.com"; // Your bot backend
+const PaymentCheck = () => {
+  const [telegramId, setTelegramId] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-const PaymentPage = () => {
-  const query = new URLSearchParams(window.location.search);
-  const telegramId = query.get("telegramId");
-
-  useEffect(() => {
-    if (!telegramId) {
-      alert("Telegram ID missing in URL!");
+  const checkPayment = async () => {
+    if (!telegramId.trim()) {
+      setError("Please enter a Telegram ID");
+      setResult(null);
+      return;
     }
-  }, [telegramId]);
-
-  const handlePayment = async () => {
-    if (!telegramId) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/create-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ telegramId }),
-      });
-
+      const res = await fetch(`/api/payments/check/${telegramId.trim()}`);
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to fetch payment");
+      }
       const data = await res.json();
-
-      const options = {
-        key: "rzp_test_wU21klHA5cKF02", // 🛑 Replace with real Razorpay Key ID
-        amount: data.amount,
-        currency: data.currency,
-        name: "AI Girlfriend Chat",
-        description: "Premium Access Plan",
-        order_id: data.orderId,
-        handler: function (response) {
-          alert("✅ Payment successful! Returning to bot...");
-          window.location.href = "https://t.me/AiGirlfriendbot54329Bot"; // ✅ Your bot link
-        },
-        prefill: {
-          name: "Telegram User",
-          email: "user@example.com",
-        },
-        notes: {
-          telegramId,
-        },
-        theme: {
-          color: "#ff4081",
-        },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (error) {
-      console.error("Payment error:", error);
-      alert("❌ Failed to initiate payment. Try again.");
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="payment-container">
-      <h1>💖 Unlock AI Girlfriend Premium</h1>
-      <p>Just ₹499 for unlimited chats for 30 days.</p>
-      <button onClick={handlePayment}>Pay ₹499 Now</button>
+    <div style={{ maxWidth: 400, margin: "auto", padding: 20 }}>
+      <h2>Check Payment Status</h2>
+      <input
+        type="text"
+        placeholder="Enter Telegram ID"
+        value={telegramId}
+        onChange={(e) => setTelegramId(e.target.value)}
+        style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+      />
+      <button onClick={checkPayment} disabled={loading} style={{ width: "100%", padding: "10px" }}>
+        {loading ? "Checking..." : "Check Payment"}
+      </button>
+
+      {error && <p style={{ color: "red", marginTop: 10 }}>{error}</p>}
+
+      {result && (
+        <div style={{ marginTop: 20, padding: 10, backgroundColor: "#f0f0f0" }}>
+          <p>
+            <strong>Status:</strong>{" "}
+            {result.valid ? (
+              <span style={{ color: "green" }}>Active</span>
+            ) : (
+              <span style={{ color: "orange" }}>Expired or Not Found</span>
+            )}
+          </p>
+          <p>
+            <strong>Message:</strong> {result.message}
+          </p>
+          {result.payment && (
+            <>
+              <p>
+                <strong>Payment ID:</strong> {result.payment.paymentId}
+              </p>
+              <p>
+                <strong>Amount:</strong> ₹{result.payment.amount}
+              </p>
+              <p>
+                <strong>Verified At:</strong>{" "}
+                {result.payment.verifiedAt
+                  ? new Date(result.payment.verifiedAt).toLocaleString()
+                  : "Not verified"}
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
-export default PaymentPage;
+export default PaymentCheck;
