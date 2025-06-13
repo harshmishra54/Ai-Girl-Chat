@@ -28,7 +28,9 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use("/api/user", userRoutes);
-app.use("/api/chat", chatRoutes); 
+app.use("/api/chat", chatRoutes);
+app.use("/")
+// app.use('/api/payments', paymentRoutes);
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
