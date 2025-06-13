@@ -29,7 +29,11 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/chat", chatRoutes);
-app.use("/")
+// app.use("/")
+app.get("/ping", (req, res) => {
+  res.send("Pong!");
+});
+
 // app.use('/api/payments', paymentRoutes);
 
 const PORT = process.env.PORT || 8080;
