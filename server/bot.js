@@ -14,7 +14,7 @@ const Image = require("./models/Image"); // Adjust the path if different
 
 require("dotenv").config();
 const cors = require("cors");
-app.use(cors());
+// app.use(cors());
 app.use(cors({
   origin: "https://ai-girl-chat.netlify.app"
 }));
