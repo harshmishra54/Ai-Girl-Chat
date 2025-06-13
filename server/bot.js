@@ -36,7 +36,7 @@ const bot = APP_URL
   { command: "photo", description: "📸 Send me a random photo" },
   { command: "start", description: "🧠 Start Chat with Ayesha" },
   { command: "verify", description: "🔐 Verify Payment" },
-  { command: "help", description: "📖 Help & Commands" },
+  // { command: "help", description: "📖 Help & Commands" },
 ]);
 
 
@@ -184,7 +184,7 @@ if (text === "📸 Send me a Photo" || text === "/photo") {
       "🆘 *Available Commands:*\n" +
         "/start - Get started\n" +
         "/verify payment_id - Verify your payment\n" +
-        "/help - Show this help message",
+        // "/help - Show this help message",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
