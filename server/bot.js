@@ -445,6 +445,32 @@ app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
 
   res.sendStatus(200);
 });
+//=======Payment Status=====
+app.get("/api/payments/check/:telegramId", async (req, res) => {
+  const { telegramId } = req.params;
+
+  try {
+    const payment = await Payment.findOne({ telegramId }).sort({ verifiedAt: -1 });
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "No payment found for this Telegram ID" });
+    }
+
+    // Handle expiration based on plan (assume 1-day plan)
+    const isExpired =
+      payment.verifiedAt &&
+      new Date().getTime() - new Date(payment.verifiedAt).getTime() > 24 * 60 * 60 * 1000;
+
+    if (isExpired) {
+      return res.json({ success: true, valid: false, message: "Subscription expired", payment });
+    }
+
+    return res.json({ success: true, valid: true, message: "Payment valid", payment });
+  } catch (err) {
+    console.error("Payment check error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 // ================= START SERVER Deployment =================
 mongoose
