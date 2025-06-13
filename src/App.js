@@ -10,6 +10,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import RefundPolicy from "./pages/RefundPolicy";
 import BotPage from "./pages/BotPage";
 import ContactUs from "./pages/ContactUs";
+import PaymentPage from "./pages/PaymentPage"; // <-- import PaymentPage
 
 // ✅ Only checks for age verification now
 const PrivateRoute = ({ children }) => {
@@ -86,6 +87,16 @@ const App = () => {
           element={
             <PrivateRoute>
               <BotPage />
+            </PrivateRoute>
+          }
+        />
+
+        {/* New Payment Page route */}
+        <Route
+          path="/payments"
+          element={
+            <PrivateRoute>
+              <PaymentPage />
             </PrivateRoute>
           }
         />
