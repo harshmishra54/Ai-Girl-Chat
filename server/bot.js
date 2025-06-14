@@ -42,6 +42,10 @@ const bot = APP_URL
 
 const app = express();
 app.use(express.json());
+app.get("/", (req, res) => {
+  res.send("✅ Telegram Bot Server is Running");
+});
+
 
 // ================= SCHEMAS =================
 const userSchema = new mongoose.Schema({
