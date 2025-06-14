@@ -33,6 +33,10 @@ app.use("/api/chat", chatRoutes);
 app.get("/ping", (req, res) => {
   res.send("Pong!");
 });
+// Root route for GET /
+app.get("/", (req, res) => {
+  res.send("AI Girl Chat Server is active!");
+});
 
 // app.use('/api/payments', paymentRoutes);
 
