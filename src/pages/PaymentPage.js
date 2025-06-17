@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
+
+// Attach autoTable to jsPDF prototype
+autoTable(jsPDF);
 
 const PaymentPage = () => {
   const [telegramId, setTelegramId] = useState("");
@@ -11,7 +14,6 @@ const PaymentPage = () => {
     try {
       const response = await fetch(`https://ai-girl-chat-2.onrender.com/api/payments/check/${telegramId}`);
       const data = await response.json();
-      console.log("Fetched:", data);
 
       if (!response.ok || !data.success || !data.payment) {
         throw new Error(data.message || "Invalid Telegram ID or server issue.");
@@ -38,8 +40,8 @@ const PaymentPage = () => {
       head: [["Field", "Value"]],
       body: [
         ["Telegram ID", payment.notes?.telegramId || "-"],
-        ["Payment ID", payment.paymentId],
-        ["Amount (₹)", payment.amount],
+        ["Payment ID", payment.paymentId || "-"],
+        ["Amount (₹)", payment.amount || "-"],
         ["Verified At", payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "Not Verified"],
         ["Status", payment.verifiedAt ? "Verified" : "Not Verified"],
         ["UPI/VPA", payment.raw?.vpa || "N/A"],
@@ -48,7 +50,7 @@ const PaymentPage = () => {
     });
 
     doc.setFontSize(10);
-    doc.text("Thank you for your purchase! - AI Girl Chat", 14, doc.lastAutoTable.finalY + 10);
+    doc.text("Thank you for your payment! - AI Girl Chat", 14, doc.lastAutoTable.finalY + 10);
 
     doc.save(`invoice_${telegramId}.pdf`);
   };
@@ -71,8 +73,8 @@ const PaymentPage = () => {
           <h3>Payment Details:</h3>
           <ul>
             <li><strong>Telegram ID:</strong> {payment.notes?.telegramId || "-"}</li>
-            <li><strong>Payment ID:</strong> {payment.paymentId}</li>
-            <li><strong>Amount:</strong> ₹{payment.amount}</li>
+            <li><strong>Payment ID:</strong> {payment.paymentId || "-"}</li>
+            <li><strong>Amount:</strong> ₹{payment.amount || "-"}</li>
             <li><strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"}</li>
             <li><strong>Verified At:</strong> {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}</li>
             <li><strong>UPI/VPA:</strong> {payment.raw?.vpa || "N/A"}</li>
