@@ -4,6 +4,7 @@ const express = require("express");
 const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
+const cors = require("cors");
 
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
@@ -21,6 +22,12 @@ const BOT_API_KEY = process.env.BOT_API_KEY;
 const APP_URL = process.env.APP_URL;
 const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 const MONGO_URI = process.env.MONGO_URI;
+
+app.use(cors({
+  origin: "https://ai-girl-chat.netlify.app", // ✅ Your frontend domain
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
 
 const razorpay = new Razorpay({
