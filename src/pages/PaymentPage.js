@@ -9,13 +9,14 @@ const PaymentPage = () => {
     try {
       const response = await fetch(`https://ai-girl-chat-2.onrender.com/api/payments/check/${telegramId}`);
 
-      
       if (!response.ok) {
         throw new Error("Failed to fetch payment data.");
       }
 
       const data = await response.json();
-      setPayments(data);
+      console.log("Fetched:", data); // 🔍 debug log
+
+      setPayments(data.payments || []); // ✅ FIXED LINE
       setError("");
     } catch (err) {
       console.error("Error fetching payments:", err.message);
@@ -43,8 +44,10 @@ const PaymentPage = () => {
           <ul>
             {payments.map((payment) => (
               <li key={payment.paymentId}>
-                <strong>ID:</strong> {payment.paymentId} | <strong>Amount:</strong> ₹{payment.amount} | <strong>Status:</strong>{" "}
-                {payment.verifiedAt ? "Verified" : "Not Verified"} | <strong>Date:</strong> {new Date(payment.verifiedAt).toLocaleString()}
+                <strong>ID:</strong> {payment.paymentId} | <strong>Amount:</strong> ₹{payment.amount} |{" "}
+                <strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"} |{" "}
+                <strong>Date:</strong>{" "}
+                {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}
               </li>
             ))}
           </ul>
