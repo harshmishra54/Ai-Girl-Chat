@@ -2,10 +2,8 @@ import React, { useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-// ✅ Attach autoTable to jsPDF prototype manually
+// Attach autoTable plugin to jsPDF prototype properly
 jsPDF.API.autoTable = autoTable;
-
- // ✅ Just import it like this (NO autoTable(jsPDF))
 
 const PaymentPage = () => {
   const [telegramId, setTelegramId] = useState("");
@@ -24,16 +22,19 @@ const PaymentPage = () => {
       setPayment(data.payment);
       setError("");
     } catch (err) {
-      console.error("Error fetching payments:", err.message);
       setError(err.message);
       setPayment(null);
     }
   };
 
   const downloadPDF = () => {
+    if (!payment) return;
+
     const doc = new jsPDF();
+
     doc.setFontSize(18);
     doc.text("AI Girl Chat - Payment Invoice", 14, 22);
+
     doc.setFontSize(12);
     doc.text(`Invoice Date: ${new Date().toLocaleString()}`, 14, 30);
 
@@ -66,7 +67,9 @@ const PaymentPage = () => {
         value={telegramId}
         onChange={(e) => setTelegramId(e.target.value)}
       />
-      <button onClick={fetchPayments} style={{ marginLeft: "10px" }}>Check</button>
+      <button onClick={fetchPayments} style={{ marginLeft: "10px" }}>
+        Check
+      </button>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
 
@@ -74,13 +77,27 @@ const PaymentPage = () => {
         <div style={{ marginTop: "2rem" }}>
           <h3>Payment Details:</h3>
           <ul>
-            <li><strong>Telegram ID:</strong> {payment.notes?.telegramId || "-"}</li>
-            <li><strong>Payment ID:</strong> {payment.paymentId || "-"}</li>
-            <li><strong>Amount:</strong> ₹{payment.amount || "-"}</li>
-            <li><strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"}</li>
-            <li><strong>Verified At:</strong> {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}</li>
-            <li><strong>UPI/VPA:</strong> {payment.raw?.vpa || "N/A"}</li>
-            <li><strong>Email:</strong> {payment.raw?.email || "N/A"}</li>
+            <li>
+              <strong>Telegram ID:</strong> {payment.notes?.telegramId || "-"}
+            </li>
+            <li>
+              <strong>Payment ID:</strong> {payment.paymentId || "-"}
+            </li>
+            <li>
+              <strong>Amount:</strong> ₹{payment.amount || "-"}
+            </li>
+            <li>
+              <strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"}
+            </li>
+            <li>
+              <strong>Verified At:</strong> {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}
+            </li>
+            <li>
+              <strong>UPI/VPA:</strong> {payment.raw?.vpa || "N/A"}
+            </li>
+            <li>
+              <strong>Email:</strong> {payment.raw?.email || "N/A"}
+            </li>
           </ul>
 
           <button onClick={downloadPDF} style={{ marginTop: "1rem" }}>
