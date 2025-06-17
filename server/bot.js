@@ -77,10 +77,37 @@ const paymentSchema = new mongoose.Schema({
 
 const Payment = mongoose.model("Payment", paymentSchema);
 
-// ================= PAYMENT LINK FUNCTION =================
+const paymentLinkSchema = new mongoose.Schema(
+  {
+    telegramId: { type: String },
+    amount: { type: Number },
+    durationLabel: { type: String },
+    link: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    expiresAt: { type: Date },
+  },
+  { timestamps: true }
+);
+const PaymentLink=mongoose.model("PaymentLink", paymentLinkSchema)
+
+// Payment Link Creation
 async function createPaymentLink(telegramId, amount, durationLabel) {
   try {
-    const paymentLink = await razorpay.paymentLink.create({
+    const now = new Date();
+    const existing = await PaymentLink.findOne({
+      telegramId,
+      amount,
+      durationLabel,
+      expiresAt: { $gt: now }, // not yet expired
+    });
+
+    if (existing) {
+      console.log("Reusing existing link");
+      return existing.link;
+    }
+
+    // Otherwise, create a new payment link
+    const razorpayLink = await razorpay.paymentLink.create({
       amount: amount * 100,
       currency: "INR",
       description: `AI Resume Builder - ${durationLabel}`,
@@ -91,9 +118,21 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
       notify: { sms: false, email: false },
       reminder_enable: true,
       notes: { telegramId: telegramId.toString() },
-      expire_by: Math.floor(Date.now() / 1000) + 86400 * 3, // use 'expire_by' instead of 'expiry_date'
+      expire_by: Math.floor(Date.now() / 1000) + 86400 * 3, // 3 days
     });
-    return paymentLink.short_url;
+
+    // Save to DB
+    const newLink = new PaymentLink({
+      telegramId,
+      amount,
+      durationLabel,
+      link: razorpayLink.short_url,
+      createdAt: now,
+      expiresAt: new Date(now.getTime() + 86400 * 1000 * 3),
+    });
+
+    await newLink.save();
+    return razorpayLink.short_url;
   } catch (err) {
     console.error("Razorpay error:", err.error || err.message);
     return null;
