@@ -1,6 +1,11 @@
 import React, { useState } from "react";
 import jsPDF from "jspdf";
-import "jspdf-autotable"; // ✅ Just import it like this (NO autoTable(jsPDF))
+import autoTable from "jspdf-autotable";
+
+// ✅ Attach autoTable to jsPDF prototype manually
+jsPDF.API.autoTable = autoTable;
+
+ // ✅ Just import it like this (NO autoTable(jsPDF))
 
 const PaymentPage = () => {
   const [telegramId, setTelegramId] = useState("");
