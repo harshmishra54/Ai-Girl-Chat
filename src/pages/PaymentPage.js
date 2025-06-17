@@ -1,32 +1,60 @@
 import React, { useState } from "react";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 const PaymentPage = () => {
   const [telegramId, setTelegramId] = useState("");
-  const [payments, setPayments] = useState([]);
+  const [payment, setPayment] = useState(null);
   const [error, setError] = useState("");
 
   const fetchPayments = async () => {
     try {
       const response = await fetch(`https://ai-girl-chat-2.onrender.com/api/payments/check/${telegramId}`);
+      const data = await response.json();
+      console.log("Fetched:", data);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch payment data.");
+      if (!response.ok || !data.success || !data.payment) {
+        throw new Error(data.message || "Invalid Telegram ID or server issue.");
       }
 
-      const data = await response.json();
-      console.log("Fetched:", data); // 🔍 debug log
-
-      setPayments(data.payments || []); // ✅ FIXED LINE
+      setPayment(data.payment);
       setError("");
     } catch (err) {
       console.error("Error fetching payments:", err.message);
-      setError("Invalid Telegram ID or server issue.");
-      setPayments([]);
+      setError(err.message);
+      setPayment(null);
     }
   };
 
+  const downloadPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text("AI Girl Chat - Payment Invoice", 14, 22);
+    doc.setFontSize(12);
+    doc.text(`Invoice Date: ${new Date().toLocaleString()}`, 14, 30);
+
+    doc.autoTable({
+      startY: 40,
+      head: [["Field", "Value"]],
+      body: [
+        ["Telegram ID", payment.notes?.telegramId || "-"],
+        ["Payment ID", payment.paymentId],
+        ["Amount (₹)", payment.amount],
+        ["Verified At", payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "Not Verified"],
+        ["Status", payment.verifiedAt ? "Verified" : "Not Verified"],
+        ["UPI/VPA", payment.raw?.vpa || "N/A"],
+        ["Email", payment.raw?.email || "N/A"],
+      ],
+    });
+
+    doc.setFontSize(10);
+    doc.text("Thank you for your purchase! - AI Girl Chat", 14, doc.lastAutoTable.finalY + 10);
+
+    doc.save(`invoice_${telegramId}.pdf`);
+  };
+
   return (
-    <div style={{ padding: "2rem" }}>
+    <div style={{ padding: "2rem", fontFamily: "Arial" }}>
       <h2>Check Payment Status</h2>
       <input
         type="text"
@@ -34,23 +62,26 @@ const PaymentPage = () => {
         value={telegramId}
         onChange={(e) => setTelegramId(e.target.value)}
       />
-      <button onClick={fetchPayments}>Check</button>
+      <button onClick={fetchPayments} style={{ marginLeft: "10px" }}>Check</button>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {payments.length > 0 && (
-        <div>
-          <h3>Payment Results:</h3>
+      {payment && (
+        <div style={{ marginTop: "2rem" }}>
+          <h3>Payment Details:</h3>
           <ul>
-            {payments.map((payment) => (
-              <li key={payment.paymentId}>
-                <strong>ID:</strong> {payment.paymentId} | <strong>Amount:</strong> ₹{payment.amount} |{" "}
-                <strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"} |{" "}
-                <strong>Date:</strong>{" "}
-                {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}
-              </li>
-            ))}
+            <li><strong>Telegram ID:</strong> {payment.notes?.telegramId || "-"}</li>
+            <li><strong>Payment ID:</strong> {payment.paymentId}</li>
+            <li><strong>Amount:</strong> ₹{payment.amount}</li>
+            <li><strong>Status:</strong> {payment.verifiedAt ? "Verified" : "Not Verified"}</li>
+            <li><strong>Verified At:</strong> {payment.verifiedAt ? new Date(payment.verifiedAt).toLocaleString() : "N/A"}</li>
+            <li><strong>UPI/VPA:</strong> {payment.raw?.vpa || "N/A"}</li>
+            <li><strong>Email:</strong> {payment.raw?.email || "N/A"}</li>
           </ul>
+
+          <button onClick={downloadPDF} style={{ marginTop: "1rem" }}>
+            Download Invoice PDF
+          </button>
         </div>
       )}
     </div>
