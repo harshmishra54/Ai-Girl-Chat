@@ -23,11 +23,7 @@ const APP_URL = process.env.APP_URL;
 const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 const MONGO_URI = process.env.MONGO_URI;
 
-app.use(cors({
-  origin: "https://ai-girl-chat.netlify.app", // ✅ Your frontend domain
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
+
 
 
 const razorpay = new Razorpay({
@@ -52,6 +48,11 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("✅ Telegram Bot Server is Running");
 });
+app.use(cors({
+  origin: "https://ai-girl-chat.netlify.app", // ✅ Your frontend domain
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 
 
 // ================= SCHEMAS =================
