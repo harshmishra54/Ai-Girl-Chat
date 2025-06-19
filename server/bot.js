@@ -5,7 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const cron = require("node-cron");
 const cors = require("cors");
-
+const getAIReply = require("./utils/chatHandler");
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 const generateTTS = require('./utils/tts');
@@ -20,7 +20,7 @@ const checkPaymentStatus = require("./utils/checkPaymentStatus");
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const BOT_API_KEY = process.env.BOT_API_KEY;
 const APP_URL = process.env.APP_URL;
-const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
+// const API_URL = "https://ai-girl-chat-1.onrender.com/api/chat/chat";
 const MONGO_URI = process.env.MONGO_URI;
 
 
@@ -385,92 +385,64 @@ Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose 
     }
   }
 
-  // ========== AI CHAT ==========
-  try {
-    await bot.sendChatAction(chatId, "typing");
-
-    // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
-    let lastMessages = await MessageLog.find({ telegramId: chatId })
-      .sort({ timestamp: -1 })
-      .limit(6)
-      .lean();
-
-    lastMessages = lastMessages.reverse();
-
-    let conversationContext = "";
-    for (const msg of lastMessages) {
-      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
-    }
-
-    conversationContext += `User: ${text}\nAI:`;
-
-    const sendMessageToApi = async (message, retries = 1) => {
-      try {
-        const response = await axios.post(
-          API_URL,
-          { message },
-          {
-            headers: {
-              "x-api-key": BOT_API_KEY,
-            },
-          }
-        );
-        return response.data.reply || "Sorry, I didn't get that.";
-      } catch (error) {
-        if (retries > 0) {
-          await new Promise((r) => setTimeout(r, 2000));
-          return sendMessageToApi(message, retries - 1);
-        }
-        throw error;
-      }
-    };
-
-    const aiReply = await sendMessageToApi(conversationContext);
-
-    await MessageLog.create({
-      telegramId: chatId,
-      message: text,
-      response: aiReply,
-      timestamp: new Date(),
-    });
-
-    await bot.sendMessage(chatId, aiReply);
-    const tempDir = path.join(__dirname, "temp");
-if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
+// ========== AI CHAT ==========
 try {
-  // 1. Generate MP3 file path by saving TTS audio for aiReply text
-  const mp3Path = await generateTTS(aiReply, chatId); // should save mp3 and return mp3Path
+  await bot.sendChatAction(chatId, "typing");
 
-  // 2. Prepare OGG file path for Telegram voice format
-  const oggPath = path.join(tempDir, `${chatId}.ogg`);
+  // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
+  let lastMessages = await MessageLog.find({ telegramId: chatId })
+    .sort({ timestamp: -1 })
+    .limit(6)
+    .lean();
 
-  // 3. Convert the saved MP3 to OGG format
-  await convertMp3ToOgg(mp3Path, oggPath);
+  lastMessages = lastMessages.reverse();
 
-  // 4. Send the AI reply text once
-  // await bot.sendMessage(chatId, aiReply);
+  let conversationContext = "";
+  for (const msg of lastMessages) {
+    conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+  }
 
-  // 5. Send the OGG voice message with optional caption
-  await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
-    caption: "Here's my voice 😉",
+  conversationContext += `User: ${text}\nAI:`;
+
+  
+  const aiReply = await getAIReply(conversationContext);
+
+  await MessageLog.create({
+    telegramId: chatId,
+    message: text,
+    response: aiReply,
+    timestamp: new Date(),
   });
 
-  // 6. Cleanup temporary files
-  fs.unlinkSync(mp3Path);
-  fs.unlinkSync(oggPath);
-} catch (err) {
-  console.error("Voice generation error:", err);
-  await bot.sendMessage(chatId, "Something went wrong with voice output.");
-}
+  await bot.sendMessage(chatId, aiReply);
 
-  } catch (error) {
-    console.error("Bot error:", error.response?.data || error.message);
-    await bot.sendMessage(
-      chatId,
-      "⚠️ Something went wrong. Please try again later."
-    );
+  const tempDir = path.join(__dirname, "temp");
+  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+  try {
+    const mp3Path = await generateTTS(aiReply, chatId);
+    const oggPath = path.join(tempDir, `${chatId}.ogg`);
+
+    await convertMp3ToOgg(mp3Path, oggPath);
+
+    await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
+      caption: "Here's my voice 😉",
+    });
+
+    fs.unlinkSync(mp3Path);
+    fs.unlinkSync(oggPath);
+  } catch (err) {
+    console.error("Voice generation error:", err);
+    await bot.sendMessage(chatId, "Something went wrong with voice output.");
   }
+
+} catch (error) {
+  console.error("Bot error:", error.response?.data || error.message);
+  await bot.sendMessage(
+    chatId,
+    "⚠️ Something went wrong. Please try again later."
+  );
+}
 
   res.sendStatus(200);
 });
