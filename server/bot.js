@@ -450,7 +450,7 @@ try {
   conversationContext += `User: ${text}\nAI:`;
 
   
-  const aiReply = await getAIReply(conversationContext);
+  const aiReply = await getAIReply(conversationContext, user);
 
   await MessageLog.create({
     telegramId: chatId,
