@@ -35,14 +35,15 @@ const razorpay = new Razorpay({
 const bot = APP_URL
   ? new TelegramBot(BOT_TOKEN)
   : new TelegramBot(BOT_TOKEN, { polling: true });
-  bot.setMyCommands([
+bot.setMyCommands([
   { command: "photo", description: "📸 Send me a random photo" },
   { command: "start", description: "🧠 Start Chat with Ayesha" },
   { command: "verify", description: "🔐 Verify Payment" },
   { command: "setmood", description: "💖 Set Ayesha's mood" },
   { command: "setscene", description: "🎭 Set roleplay scene" },
   { command: "setname", description: "📝 Set your name" },
-  // { command: "help", description: "📖 Help & Commands" },
+  { command: "top", description: "🏆 Top leaderboard members" },
+  { command: "reset", description: "🧹 Reset chat memory" }, // <-- New command
 ]);
 
 
@@ -270,6 +271,13 @@ if (text.startsWith("/setmood")) {
   }
   return res.sendStatus(200);
 }
+if (text === "/reset") {
+  await MessageLog.deleteMany({ telegramId: chatId });
+
+  await bot.sendMessage(chatId, "🧠 Memory wiped! I'm starting fresh with you now 😘");
+  return res.sendStatus(200);
+}
+
 
 if (text.startsWith("/setscene")) {
   const scene = text.split(" ").slice(1).join(" ");
