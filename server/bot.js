@@ -182,7 +182,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
 
   const now = new Date();
-  const isOwner = user.telegramId === "5405202126";
+  const isOwner = user.telegramId === "1469113335";
 if (text === "/start") {
   await bot.sendMessage(
     chatId,
