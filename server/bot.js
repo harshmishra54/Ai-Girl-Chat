@@ -39,6 +39,9 @@ const bot = APP_URL
   { command: "photo", description: "📸 Send me a random photo" },
   { command: "start", description: "🧠 Start Chat with Ayesha" },
   { command: "verify", description: "🔐 Verify Payment" },
+  { command: "setmood", description: "💖 Set Ayesha's mood" },
+  { command: "setscene", description: "🎭 Set roleplay scene" },
+  { command: "setname", description: "📝 Set your name" },
   // { command: "help", description: "📖 Help & Commands" },
 ]);
 
