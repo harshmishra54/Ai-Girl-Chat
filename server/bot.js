@@ -65,6 +65,10 @@ const userSchema = new mongoose.Schema({
   paymentId: String,
   planExpiresAt: Date,
   freeChatStart: { type: Date, default: Date.now },
+  name: { type: String },
+mood: { type: String, default: "💖 Romantic" },
+scene: { type: String },
+
 });
 const User = mongoose.model("User", userSchema);
 
@@ -240,6 +244,47 @@ if (text === "📸 Send me a Photo" || text === "/photo") {
     );
     return res.sendStatus(200);
   }
+  if (text.startsWith("/setname")) {
+  const name = text.split(" ").slice(1).join(" ");
+  if (!name) {
+    await bot.sendMessage(chatId, "❗ Usage: /setname YourName");
+  } else {
+    user.name = name;
+    await user.save();
+    await bot.sendMessage(chatId, `✅ Got it, I’ll call you *${name}* now 😉`, { parse_mode: "Markdown" });
+  }
+  return res.sendStatus(200);
+}
+
+if (text.startsWith("/setmood")) {
+  const mood = text.split(" ").slice(1).join(" ");
+  if (!["💖 Romantic", "😂 Funny", "😘 Naughty"].includes(mood)) {
+    await bot.sendMessage(chatId, "❗ Choose mood:\n/setmood 💖 Romantic\n/setmood 😂 Funny\n/setmood 😘 Naughty");
+  } else {
+    user.mood = mood;
+    await user.save();
+    await bot.sendMessage(chatId, `💡 Mood set to *${mood}*`, { parse_mode: "Markdown" });
+  }
+  return res.sendStatus(200);
+}
+
+if (text.startsWith("/setscene")) {
+  const scene = text.split(" ").slice(1).join(" ");
+  if (!scene) {
+    await bot.sendMessage(chatId, "❗ Usage: /setscene beach | candlelight dinner | rainy night etc.");
+  } else {
+    user.scene = scene;
+    await user.save();
+    await bot.sendMessage(chatId, `🎭 Scene set to *${scene}*`, { parse_mode: "Markdown" });
+  }
+  return res.sendStatus(200);
+}
+
+if (text === "/top") {
+  await bot.sendMessage(chatId, "🏆 *Top Chat Lovers:*\n\n1. Ankit (205 msgs)\n2. Rohit (188 msgs)\n3. Sarthak (170 msgs)\n4. Satyam (165 msgs)\n5. You? 👀", { parse_mode: "Markdown" });
+  return res.sendStatus(200);
+}
+
 
   if (text.startsWith("/verify")) {
     const parts = text.split(" ");
