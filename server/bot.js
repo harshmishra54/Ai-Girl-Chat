@@ -201,7 +201,7 @@ if (text === "📸 Send me a Photo" || text === "/photo") {
   const now = new Date();
   const user = await User.findOne({ telegramId: chatId });
 
-  let allowed = user && user.telegramId === "5405202126"; // owner
+  let allowed = user && user.telegramId === "1469113335"; // owner
   if (user?.paymentVerified && user.paymentVerifiedAt) {
     const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
     if (
