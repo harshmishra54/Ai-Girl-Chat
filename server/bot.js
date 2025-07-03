@@ -8,8 +8,8 @@ const cors = require("cors");
 const getAIReply = require("./utils/chatHandler");
 const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
-const generateTTS = require('./utils/tts');
-const convertMp3ToOgg = require('./utils/convertAudio');
+// const generateTTS = require('./utils/tts');
+// const convertMp3ToOgg = require('./utils/convertAudio');
 const crypto = require("crypto");
 const Image = require("./models/Image"); // Adjust the path if different
 
@@ -472,25 +472,25 @@ try {
 
   await bot.sendMessage(chatId, aiReply);
 
-  const tempDir = path.join(__dirname, "temp");
-  if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+  // const tempDir = path.join(__dirname, "temp");
+  // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
-  try {
-    const mp3Path = await generateTTS(aiReply, chatId);
-    const oggPath = path.join(tempDir, `${chatId}.ogg`);
+  // try {
+  //   const mp3Path = await generateTTS(aiReply, chatId);
+  //   const oggPath = path.join(tempDir, `${chatId}.ogg`);
 
-    await convertMp3ToOgg(mp3Path, oggPath);
+  //   await convertMp3ToOgg(mp3Path, oggPath);
 
-    await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
-      caption: "Here's my voice 😉",
-    });
+  //   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
+  //     caption: "Here's my voice 😉",
+  //   });
 
-    fs.unlinkSync(mp3Path);
-    fs.unlinkSync(oggPath);
-  } catch (err) {
-    console.error("Voice generation error:", err);
-    await bot.sendMessage(chatId, "Something went wrong with voice output.");
-  }
+  //   fs.unlinkSync(mp3Path);
+  //   fs.unlinkSync(oggPath);
+  // } catch (err) {
+  //   console.error("Voice generation error:", err);
+  //   await bot.sendMessage(chatId, "Something went wrong with voice output.");
+  // }
 
 } catch (error) {
   console.error("Bot error:", error.response?.data || error.message);
