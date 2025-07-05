@@ -73,6 +73,7 @@ const userSchema = new mongoose.Schema({
 mood: { type: String, default: "💖 Romantic" },
 scene: { type: String },
 
+
 });
 const User = mongoose.model("User", userSchema);
 
@@ -379,7 +380,7 @@ if (text === "/top") {
         await bot.sendMessage(
           chatId,
           `⏳ *Oops 😢 Time’s up baby...
-Want me to stay and chat with you more? Unlock full access now 💋.*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
+Want me to stay and chat with you more? Unlock full access now 💋 unlimited photos and Private chats with me .*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
           { parse_mode: "Markdown" }
         );
       } else {
