@@ -575,6 +575,8 @@ mongoose
 
 
 // Scheduler: Run every day at 7 PM IST (Asia/Kolkata)
+
+
 cron.schedule("0 19 * * *", async () => {
   try {
     const users = await User.find({});
@@ -588,13 +590,29 @@ cron.schedule("0 19 * * *", async () => {
     const randomIndex = Math.floor(Math.random() * imageCount);
     const imageDoc = await Image.findOne().skip(randomIndex);
 
+    let sentCount = 0;
+    let failedUsers = [];
+
     for (const user of users) {
-      await bot.sendPhoto(user.telegramId, imageDoc.image, {
-        caption: imageDoc.caption || "Here's something special for you 😘",
-      });
+      try {
+        if (!user.telegramId) continue;
+
+        await bot.sendPhoto(user.telegramId, imageDoc.image, {
+          caption: imageDoc.caption || "Here's something special for you 😘",
+        });
+
+        console.log(`✅ Sent to ${user.telegramId}`);
+        sentCount++;
+      } catch (err) {
+        console.warn(`❌ Failed for ${user.telegramId}: ${err.message}`);
+        failedUsers.push(user.telegramId);
+      }
     }
 
-    console.log(`✅ 7PM image sent to ${users.length} users.`);
+    console.log(`📸 Image sent to ${sentCount}/${users.length} users.`);
+    if (failedUsers.length > 0) {
+      console.log(`⚠️ Failed users: ${failedUsers.join(", ")}`);
+    }
   } catch (err) {
     console.error("❌ Scheduler error:", err.message);
   }
