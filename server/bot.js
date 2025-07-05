@@ -577,7 +577,7 @@ mongoose
 // Scheduler: Run every day at 7 PM IST (Asia/Kolkata)
 
 
-cron.schedule("0 19 * * *", async () => {
+cron.schedule("0 20 * * *", async () => {
   try {
     const users = await User.find({});
     const imageCount = await Image.countDocuments();
