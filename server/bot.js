@@ -474,9 +474,11 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
 
     // await bot.sendMessage(chatId, aiReply);
     const aiReply = await getAIReply(conversationContext, user);
+    console.log("AI RAW RESPONSE:", aiReply);
 
     // ✅ Translate + style using Sarvam
     const finalReply = await translateWithSarvam(aiReply);
+    console.log("FINAL REPLY SENT:", finalReply);
 
     await MessageLog.create({
       telegramId: chatId,
@@ -484,6 +486,7 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
       response: finalReply,
       timestamp: new Date(),
     });
+    console.log(finalReply);
 
     await bot.sendMessage(chatId, finalReply);
 
