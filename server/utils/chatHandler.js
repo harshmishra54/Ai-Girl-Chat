@@ -58,11 +58,11 @@ User name: ${name}
           { role: "system", content: systemPrompt },
           { role: "user", content: message },
         ],
-        temperature: 0.95,        // Flirty but not chaotic
+        temperature: 0.75,        // Flirty but not chaotic
         max_tokens: 80,           // Keeps responses short
         top_p: 0.9,
-        frequency_penalty: 0.4,
-        presence_penalty: 0.3
+        frequency_penalty: 0.25,
+        presence_penalty: 0.2
       },
       {
         headers: {

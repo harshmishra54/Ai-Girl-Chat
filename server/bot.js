@@ -12,6 +12,23 @@ const Razorpay = require("razorpay");
 // const convertMp3ToOgg = require('./utils/convertAudio');
 const crypto = require("crypto");
 const Image = require("./models/Image"); // Adjust the path if different
+// ===== UI OPTIONS =====
+const moods = [
+  "💖 Romantic",
+  "😘 Naughty",
+  "😂 Funny",
+  "🥺 Emotional",
+  "🔥 Flirty"
+];
+
+const scenes = {
+  "🏖 Beach Date": "beach date",
+  "🌧 Rainy Night": "rainy night",
+  "🍷 Candlelight Dinner": "candlelight dinner",
+  "🎬 Movie Night": "movie night",
+  "🛏 Cozy Bedroom": "cozy bedroom",
+  "🚗 Long Drive": "long drive"
+};
 
 require("dotenv").config();
 
@@ -163,6 +180,10 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   const chatId = update.message?.chat?.id;
   const text = update.message?.text;
+  const command =
+    text === "💖 Mood" ? "/setmood" :
+      text === "🎭 Scene" ? "/setscene" :
+        text;
 
   if (!chatId || !text) return res.sendStatus(200);
 
@@ -191,10 +212,12 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
       {
         reply_markup: {
-          keyboard: [[{ text: "📸 Send me a Photo" }]],
-          resize_keyboard: true,
-          one_time_keyboard: false,
-        },
+          keyboard: [
+            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+            [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+          ],
+          resize_keyboard: true
+        }
       }
     );
     return res.sendStatus(200);
@@ -261,15 +284,36 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  if (text.startsWith("/setmood")) {
-    const mood = text.split(" ").slice(1).join(" ");
-    if (!["💖 Romantic", "😂 Funny", "😘 Naughty"].includes(mood)) {
-      await bot.sendMessage(chatId, "❗ Choose mood:\n/setmood 💖 Romantic\n/setmood 😂 Funny\n/setmood 😘 Naughty");
-    } else {
-      user.mood = mood;
-      await user.save();
-      await bot.sendMessage(chatId, `💡 Mood set to *${mood}*`, { parse_mode: "Markdown" });
-    }
+  if (command === "/setmood") {
+    await bot.sendMessage(chatId, "💖 Choose Ayesha's mood:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💖 Romantic" }, { text: "😘 Naughty" }],
+          [{ text: "😂 Funny" }, { text: "🥺 Emotional" }],
+          [{ text: "🔥 Flirty" }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    });
+
+    return res.sendStatus(200);
+  }
+
+  if (moods.includes(text)) {
+    user.mood = text;
+    await user.save();
+
+    await bot.sendMessage(chatId, `Mood changed to ${text} 😉`, {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+        ],
+        resize_keyboard: true
+      }
+    });
+
     return res.sendStatus(200);
   }
   if (text === "/reset") {
@@ -280,15 +324,55 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
 
 
-  if (text.startsWith("/setscene")) {
-    const scene = text.split(" ").slice(1).join(" ");
-    if (!scene) {
-      await bot.sendMessage(chatId, "❗ Usage: /setscene beach | candlelight dinner | rainy night etc.");
-    } else {
-      user.scene = scene;
-      await user.save();
-      await bot.sendMessage(chatId, `🎭 Scene set to *${scene}*`, { parse_mode: "Markdown" });
-    }
+  if (command === "/setscene") {
+    await bot.sendMessage(chatId, "🎭 Pick a scene:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "🏖 Beach Date" }, { text: "🌧 Rainy Night" }],
+          [{ text: "🍷 Candlelight Dinner" }, { text: "🎬 Movie Night" }],
+          [{ text: "🛏 Cozy Bedroom" }, { text: "🚗 Long Drive" }],
+          [{ text: "❌ Clear Scene" }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    });
+
+    return res.sendStatus(200);
+  }
+
+  if (scenes[text]) {
+    user.scene = scenes[text];
+    await user.save();
+
+    await bot.sendMessage(chatId, `Scene set to *${text}* 😏`, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        keyboard: [
+          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+        ],
+        resize_keyboard: true
+      }
+    });
+
+    return res.sendStatus(200);
+  }
+
+  if (text === "❌ Clear Scene") {
+    user.scene = "";
+    await user.save();
+
+    await bot.sendMessage(chatId, "Scene cleared 😉", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+        ],
+        resize_keyboard: true
+      }
+    });
+
     return res.sendStatus(200);
   }
 
