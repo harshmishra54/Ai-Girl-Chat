@@ -1,5 +1,6 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
+const translateWithSarvam = require("./utils/sarvamTranslator");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -462,16 +463,29 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
     conversationContext += `User: ${text}\nAI:`;
 
 
+    // const aiReply = await getAIReply(conversationContext, user);
+
+    // await MessageLog.create({
+    //   telegramId: chatId,
+    //   message: text,
+    //   response: aiReply,
+    //   timestamp: new Date(),
+    // });
+
+    // await bot.sendMessage(chatId, aiReply);
     const aiReply = await getAIReply(conversationContext, user);
+
+    // ✅ Translate + style using Sarvam
+    const finalReply = await translateWithSarvam(aiReply);
 
     await MessageLog.create({
       telegramId: chatId,
       message: text,
-      response: aiReply,
+      response: finalReply,
       timestamp: new Date(),
     });
 
-    await bot.sendMessage(chatId, aiReply);
+    await bot.sendMessage(chatId, finalReply);
 
     // const tempDir = path.join(__dirname, "temp");
     // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
