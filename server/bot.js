@@ -1,7 +1,5 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
-const translate = require("./utils/translator");
-const translateWithSarvam = require("./utils/sarvamTranslator");
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -46,7 +44,6 @@ bot.setMyCommands([
   { command: "setname", description: "📝 Set your name" },
   { command: "top", description: "🏆 Top leaderboard members" },
   { command: "reset", description: "🧹 Reset chat memory" }, // <-- New command
-  { command: "language", description: "🌐 Choose chat language" },
 ]);
 
 
@@ -75,7 +72,6 @@ const userSchema = new mongoose.Schema({
   name: { type: String },
   mood: { type: String, default: "💖 Romantic" },
   scene: { type: String },
-  language: { type: String, default: "en" }, // en | hi
 
 
 });
@@ -200,39 +196,6 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
           one_time_keyboard: false,
         },
       }
-    );
-    return res.sendStatus(200);
-  }
-  if (text === "/language") {
-    await bot.sendMessage(chatId, "Choose your language 👇", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "🇮🇳 Hindi / Hinglish" }],
-          [{ text: "🇬🇧 English" }],
-        ],
-        resize_keyboard: true,
-      },
-    });
-    return res.sendStatus(200);
-  }
-  if (text === "🇮🇳 Hindi / Hinglish") {
-    user.language = "hi";
-    await user.save();
-
-    await bot.sendMessage(
-      chatId,
-      "Perfect 😘 Ab hum Hinglish me baat karenge!"
-    );
-    return res.sendStatus(200);
-  }
-
-  if (text === "🇬🇧 English") {
-    user.language = "en";
-    await user.save();
-
-    await bot.sendMessage(
-      chatId,
-      "Got it 😉 We'll chat in English now!"
     );
     return res.sendStatus(200);
   }
@@ -496,54 +459,19 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
       conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
     }
 
-    let userInputForAI = text;
-
-    // If Hindi user → translate to English FIRST
-    if (user.language === "hi") {
-      console.log("Translating user Hindi → English");
-      userInputForAI = await translate(text, "en-IN");
-    }
-
-    conversationContext += `User: ${userInputForAI}\nAI:`;
+    conversationContext += `User: ${text}\nAI:`;
 
 
-    // const aiReply = await getAIReply(conversationContext, user);
-
-    // await MessageLog.create({
-    //   telegramId: chatId,
-    //   message: text,
-    //   response: aiReply,
-    //   timestamp: new Date(),
-    // });
-
-    // await bot.sendMessage(chatId, aiReply);
     const aiReply = await getAIReply(conversationContext, user);
-    console.log("AI RAW RESPONSE:", aiReply);
-
-    // ✅ Translate + style using Sarvam
-    let finalReply = aiReply;
-
-    if (user.language === "hi") {
-      console.log("Translating AI → Hinglish Hindi");
-
-      finalReply = await translate(aiReply, "hi-IN");
-
-      // Optional polish instruction
-      finalReply =
-        "💬 " +
-        finalReply.replace("आप", "tum").replace("हैं", "ho");
-    }
-    console.log("FINAL REPLY SENT:", finalReply);
 
     await MessageLog.create({
       telegramId: chatId,
       message: text,
-      response: finalReply,
+      response: aiReply,
       timestamp: new Date(),
     });
-    console.log(finalReply);
 
-    await bot.sendMessage(chatId, finalReply);
+    await bot.sendMessage(chatId, aiReply);
 
     // const tempDir = path.join(__dirname, "temp");
     // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
