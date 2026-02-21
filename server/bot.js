@@ -1,4 +1,5 @@
 const TelegramBot = require("node-telegram-bot-api");
+const translateWithSarvam = require("./utils/sarvamTranslator");
 const axios = require("axios");
 const express = require("express");
 const path = require("path");
@@ -64,14 +65,14 @@ const userSchema = new mongoose.Schema({
   telegramId: String,
   email: { type: String, unique: true, sparse: true },
   paymentVerified: { type: Boolean, default: false },
-   paymentAmount: Number, // Add this
+  paymentAmount: Number, // Add this
   paymentVerifiedAt: Date, // Add this
   paymentId: String,
   planExpiresAt: Date,
   freeChatStart: { type: Date, default: Date.now },
   name: { type: String },
-mood: { type: String, default: "💖 Romantic" },
-scene: { type: String },
+  mood: { type: String, default: "💖 Romantic" },
+  scene: { type: String },
 
 
 });
@@ -105,7 +106,7 @@ const paymentLinkSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-const PaymentLink=mongoose.model("PaymentLink", paymentLinkSchema)
+const PaymentLink = mongoose.model("PaymentLink", paymentLinkSchema)
 
 // Payment Link Creation
 async function createPaymentLink(telegramId, amount, durationLabel) {
@@ -185,56 +186,56 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   const now = new Date();
   const isOwner = user.telegramId === "1469113335";
-if (text === "/start") {
-  await bot.sendMessage(
-    chatId,
-    "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
-    {
-      reply_markup: {
-        keyboard: [[{ text: "📸 Send me a Photo" }]],
-        resize_keyboard: true,
-        one_time_keyboard: false,
-      },
+  if (text === "/start") {
+    await bot.sendMessage(
+      chatId,
+      "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
+      {
+        reply_markup: {
+          keyboard: [[{ text: "📸 Send me a Photo" }]],
+          resize_keyboard: true,
+          one_time_keyboard: false,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+  if (text === "📸 Send me a Photo" || text === "/photo") {
+    const now = new Date();
+    const user = await User.findOne({ telegramId: chatId });
+
+    let allowed = user && user.telegramId === "1469113335"; // owner
+    if (user?.paymentVerified && user.paymentVerifiedAt) {
+      const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
+      if (
+        (user.paymentAmount === 20 && diffH <= 24) ||
+        (user.paymentAmount === 59 && diffH <= 168) ||
+        (user.paymentAmount === 99 && diffH <= 720)
+      ) allowed = true;
     }
-  );
-  return res.sendStatus(200);
-}
-if (text === "📸 Send me a Photo" || text === "/photo") {
-  const now = new Date();
-  const user = await User.findOne({ telegramId: chatId });
 
-  let allowed = user && user.telegramId === "1469113335"; // owner
-  if (user?.paymentVerified && user.paymentVerifiedAt) {
-    const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
-    if (
-      (user.paymentAmount === 20 && diffH <= 24) ||
-      (user.paymentAmount === 59 && diffH <= 168) ||
-      (user.paymentAmount === 99 && diffH <= 720)
-    ) allowed = true;
-  }
+    if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
+      allowed = true;
+    }
 
-  if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
-    allowed = true;
-  }
+    if (!allowed) {
+      const link1 = await createPaymentLink(chatId, 20, "1 Day");
+      const link2 = await createPaymentLink(chatId, 59, "7 Days");
+      const link3 = await createPaymentLink(chatId, 99, "30 Days");
+      await bot.sendMessage(chatId, `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`);
+      return res.sendStatus(200);
+    }
 
-  if (!allowed) {
-    const link1 = await createPaymentLink(chatId, 20, "1 Day");
-    const link2 = await createPaymentLink(chatId, 59, "7 Days");
-    const link3 = await createPaymentLink(chatId, 99, "30 Days");
-    await bot.sendMessage(chatId, `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`);
+    const count = await Image.countDocuments();
+    if (count === 0) {
+      await bot.sendMessage(chatId, "❌ No photos to show right now.");
+      return res.sendStatus(200);
+    }
+    const random = Math.floor(Math.random() * count);
+    const imageDoc = await Image.findOne().skip(random);
+    await bot.sendPhoto(chatId, imageDoc.image, { caption: imageDoc.caption || "😘" });
     return res.sendStatus(200);
   }
-
-  const count = await Image.countDocuments();
-  if (count === 0) {
-    await bot.sendMessage(chatId, "❌ No photos to show right now.");
-    return res.sendStatus(200);
-  }
-  const random = Math.floor(Math.random() * count);
-  const imageDoc = await Image.findOne().skip(random);
-  await bot.sendPhoto(chatId, imageDoc.image, { caption: imageDoc.caption || "😘" });
-  return res.sendStatus(200);
-}
 
 
 
@@ -242,60 +243,60 @@ if (text === "📸 Send me a Photo" || text === "/photo") {
     await bot.sendMessage(
       chatId,
       "🆘 *Available Commands:*\n" +
-        "/start - Get started\n" +
-        "/verify payment_id - Verify your payment\n" +
-        // "/help - Show this help message",
+      "/start - Get started\n" +
+      "/verify payment_id - Verify your payment\n" +
+      // "/help - Show this help message",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
   }
   if (text.startsWith("/setname")) {
-  const name = text.split(" ").slice(1).join(" ");
-  if (!name) {
-    await bot.sendMessage(chatId, "❗ Usage: /setname YourName");
-  } else {
-    user.name = name;
-    await user.save();
-    await bot.sendMessage(chatId, `✅ Got it, I’ll call you *${name}* now 😉`, { parse_mode: "Markdown" });
+    const name = text.split(" ").slice(1).join(" ");
+    if (!name) {
+      await bot.sendMessage(chatId, "❗ Usage: /setname YourName");
+    } else {
+      user.name = name;
+      await user.save();
+      await bot.sendMessage(chatId, `✅ Got it, I’ll call you *${name}* now 😉`, { parse_mode: "Markdown" });
+    }
+    return res.sendStatus(200);
   }
-  return res.sendStatus(200);
-}
 
-if (text.startsWith("/setmood")) {
-  const mood = text.split(" ").slice(1).join(" ");
-  if (!["💖 Romantic", "😂 Funny", "😘 Naughty"].includes(mood)) {
-    await bot.sendMessage(chatId, "❗ Choose mood:\n/setmood 💖 Romantic\n/setmood 😂 Funny\n/setmood 😘 Naughty");
-  } else {
-    user.mood = mood;
-    await user.save();
-    await bot.sendMessage(chatId, `💡 Mood set to *${mood}*`, { parse_mode: "Markdown" });
+  if (text.startsWith("/setmood")) {
+    const mood = text.split(" ").slice(1).join(" ");
+    if (!["💖 Romantic", "😂 Funny", "😘 Naughty"].includes(mood)) {
+      await bot.sendMessage(chatId, "❗ Choose mood:\n/setmood 💖 Romantic\n/setmood 😂 Funny\n/setmood 😘 Naughty");
+    } else {
+      user.mood = mood;
+      await user.save();
+      await bot.sendMessage(chatId, `💡 Mood set to *${mood}*`, { parse_mode: "Markdown" });
+    }
+    return res.sendStatus(200);
   }
-  return res.sendStatus(200);
-}
-if (text === "/reset") {
-  await MessageLog.deleteMany({ telegramId: chatId });
+  if (text === "/reset") {
+    await MessageLog.deleteMany({ telegramId: chatId });
 
-  await bot.sendMessage(chatId, "🧠 Memory wiped! I'm starting fresh with you now 😘");
-  return res.sendStatus(200);
-}
-
-
-if (text.startsWith("/setscene")) {
-  const scene = text.split(" ").slice(1).join(" ");
-  if (!scene) {
-    await bot.sendMessage(chatId, "❗ Usage: /setscene beach | candlelight dinner | rainy night etc.");
-  } else {
-    user.scene = scene;
-    await user.save();
-    await bot.sendMessage(chatId, `🎭 Scene set to *${scene}*`, { parse_mode: "Markdown" });
+    await bot.sendMessage(chatId, "🧠 Memory wiped! I'm starting fresh with you now 😘");
+    return res.sendStatus(200);
   }
-  return res.sendStatus(200);
-}
 
-if (text === "/top") {
-  await bot.sendMessage(chatId, "🏆 *Top Chat Lovers:*\n\n1. Ankit (205 msgs)\n2. Rohit (188 msgs)\n3. Sarthak (170 msgs)\n4. Satyam (165 msgs)\n5. You? 👀", { parse_mode: "Markdown" });
-  return res.sendStatus(200);
-}
+
+  if (text.startsWith("/setscene")) {
+    const scene = text.split(" ").slice(1).join(" ");
+    if (!scene) {
+      await bot.sendMessage(chatId, "❗ Usage: /setscene beach | candlelight dinner | rainy night etc.");
+    } else {
+      user.scene = scene;
+      await user.save();
+      await bot.sendMessage(chatId, `🎭 Scene set to *${scene}*`, { parse_mode: "Markdown" });
+    }
+    return res.sendStatus(200);
+  }
+
+  if (text === "/top") {
+    await bot.sendMessage(chatId, "🏆 *Top Chat Lovers:*\n\n1. Ankit (205 msgs)\n2. Rohit (188 msgs)\n3. Sarthak (170 msgs)\n4. Satyam (165 msgs)\n5. You? 👀", { parse_mode: "Markdown" });
+    return res.sendStatus(200);
+  }
 
 
   if (text.startsWith("/verify")) {
@@ -396,7 +397,7 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
       await bot.sendMessage(
         chatId,
         "👋 Welcome! You have a 10-minute free trial to chat with AI.\n" +
-          "After that, choose a plan starting at ₹20.\n\nType /help for commands."
+        "After that, choose a plan starting at ₹20.\n\nType /help for commands."
       );
       return res.sendStatus(200);
     }
@@ -442,73 +443,78 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
     }
   }
 
-// ========== AI CHAT ==========
-try {
-  await bot.sendChatAction(chatId, "typing");
+  // ========== AI CHAT ==========
+  try {
+    await bot.sendChatAction(chatId, "typing");
 
-  // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
-  let lastMessages = await MessageLog.find({ telegramId: chatId })
-    .sort({ timestamp: -1 })
-    .limit(6)
-    .lean();
+    // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
+    let lastMessages = await MessageLog.find({ telegramId: chatId })
+      .sort({ timestamp: -1 })
+      .limit(6)
+      .lean();
 
-  lastMessages = lastMessages.reverse();
+    lastMessages = lastMessages.reverse();
 
-  let conversationContext = "";
-  for (const msg of lastMessages) {
-    conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+    let conversationContext = "";
+    for (const msg of lastMessages) {
+      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
+    }
+
+    conversationContext += `User: ${text}\nAI:`;
+
+
+    const aiReply = await getAIReply(conversationContext, user);
+
+    // ✅ Translate + style using Sarvam
+    const finalReply = await translateWithSarvam(aiReply);
+
+    await MessageLog.create({
+      telegramId: chatId,
+      message: text,
+      response: finalReply,
+      timestamp: new Date(),
+    });
+
+    await bot.sendMessage(chatId, finalReply);
+
+    // const tempDir = path.join(__dirname, "temp");
+    // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+    // try {
+    //   const mp3Path = await generateTTS(aiReply, chatId);
+    //   const oggPath = path.join(tempDir, `${chatId}.ogg`);
+
+    //   await convertMp3ToOgg(mp3Path, oggPath);
+
+    //   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
+    //     caption: "Here's my voice 😉",
+    //   });
+
+    //   fs.unlinkSync(mp3Path);
+    //   fs.unlinkSync(oggPath);
+    // } catch (err) {
+    //   console.error("Voice generation error:", err);
+    //   await bot.sendMessage(chatId, "Something went wrong with voice output.");
+    // }
+
+  } catch (error) {
+    console.error("Bot error:", error.response?.data || error.message);
+    await bot.sendMessage(
+      chatId,
+      "⚠️ Something went wrong. Please try again later."
+    );
   }
-
-  conversationContext += `User: ${text}\nAI:`;
-
-  
-  const aiReply = await getAIReply(conversationContext, user);
-
-  await MessageLog.create({
-    telegramId: chatId,
-    message: text,
-    response: aiReply,
-    timestamp: new Date(),
-  });
-
-  await bot.sendMessage(chatId, aiReply);
-
-  // const tempDir = path.join(__dirname, "temp");
-  // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
-
-  // try {
-  //   const mp3Path = await generateTTS(aiReply, chatId);
-  //   const oggPath = path.join(tempDir, `${chatId}.ogg`);
-
-  //   await convertMp3ToOgg(mp3Path, oggPath);
-
-  //   await bot.sendVoice(chatId, fs.createReadStream(oggPath), {
-  //     caption: "Here's my voice 😉",
-  //   });
-
-  //   fs.unlinkSync(mp3Path);
-  //   fs.unlinkSync(oggPath);
-  // } catch (err) {
-  //   console.error("Voice generation error:", err);
-  //   await bot.sendMessage(chatId, "Something went wrong with voice output.");
-  // }
-
-} catch (error) {
-  console.error("Bot error:", error.response?.data || error.message);
-  await bot.sendMessage(
-    chatId,
-    "⚠️ Something went wrong. Please try again later."
-  );
-}
 
   res.sendStatus(200);
 });
 
 // ================= RAZORPAY WEBHOOK =================
 // ======== RAZORPAY WEBHOOK =========
-app.post("/razorpay/webhook", express.json({ verify: (req, res, buf) => {
-  req.rawBody = buf.toString();
-}}), async (req, res) => {
+app.post("/razorpay/webhook", express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}), async (req, res) => {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const signature = req.headers["x-razorpay-signature"];
 
@@ -588,227 +594,227 @@ cron.schedule("0 20 * * *", async () => {
 
     // 🎯 Array of flirty texts
     // 🎯 Big pool of 200 flirty attractive texts
-const flirtyTexts = [
-  "😏 Thinking of you right now…",
-  "💋 I wish I could whisper something naughty in your ear.",
-  "🔥 You make my heart race every time I think of you.",
-  "😘 If only you were here… I’d never let you go.",
-  "😉 Don’t blush, but you looked really hot in my dream last night.",
-  "❤️ I could get addicted to your vibes.",
-  "🥵 Just imagining us together gives me butterflies.",
-  "💖 Can I be your favorite distraction?",
-  "😈 Careful… I might just steal your heart.",
-  "👀 I bet you smile reading this… and that’s all I wanted.",
-  "🤭 You look like trouble… but the kind I want.",
-  "💌 Every message from you feels like a secret love note.",
-  "✨ I’d never get tired of your energy.",
-  "🔥 I like the way you make me lose focus.",
-  "😘 Tell me honestly… do you think about me too?",
-  "😎 If you were here, I’d probably forget how to behave.",
-  "🥰 You’re way too addictive for my peace of mind.",
-  "💋 If flirty texts were kisses, you’d be drowning by now.",
-  "😍 You make ordinary moments feel extraordinary.",
-  "🫦 If I start flirting harder, will you stop me? (please don’t 😉)",
-  "😉 I’d choose you over sleep any day.",
-  "😏 You’re the reason my phone lights up and my heart skips.",
-  "🔥 You could set my whole mood on fire with just one word.",
-  "😘 Admit it, you like me a little too much.",
-  "🥵 Thinking of your smile… dangerous move for my sanity.",
-  "❤️ If flirting is a game, I’d play only with you.",
-  "💌 Do you know how attractive you are, or should I remind you?",
-  "😈 One look from you and I’m done for.",
-  "😍 If your texts feel this good, imagine your hugs.",
-  "😘 If I were with you, we’d never stop smiling.",
-  "😉 You’re my favorite notification, every single time.",
-  "🔥 My type? Easy—just you.",
-  "💖 Stop being so irresistible, it’s distracting.",
-  "🫦 I might be blushing, but it’s your fault.",
-  "😏 You + me = a dangerous combo.",
-  "😘 Your vibe? Exactly my weakness.",
-  "🥰 You’re my daily dose of butterflies.",
-  "💌 Warning: you make my heart skip beats.",
-  "😉 If flirting were illegal, we’d be in trouble.",
-  "😎 You make ordinary chats feel like sparks.",
-  "❤️ I want to be the reason you smile at your phone.",
-  "🔥 I like the way you tease my thoughts.",
-  "😘 You’re the highlight of my day.",
-  "😍 If only you knew how attractive you look right now in my head.",
-  "💖 I’m not addicted to chatting, I’m addicted to YOU.",
-  "😉 I bet you’d look even better blushing.",
-  "😏 You have no idea how much I enjoy talking to you.",
-  "🥵 Stop making me want you more every second.",
-  "💋 I’d send you a thousand flirty texts if it kept you smiling.",
-  "😘 Tell me… when do I get to steal a hug?",
-  "🔥 You look like the kind of trouble worth risking everything for.",
-  "😍 If we were emojis, we’d be 🔥❤️😘 together.",
-  "😉 You’re too hot to handle, but I want to anyway.",
-  "💌 Just imagining your voice is enough to melt me.",
-  "🥰 I think you just became my favorite daydream.",
-  "😏 You don’t even try, and yet you make me weak.",
-  "😘 If I could, I’d keep you all to myself.",
-  "❤️ Can I borrow your smile? I’ll give it back with interest.",
-  "💖 I want to be the thought that makes you blush unexpectedly.",
-  "😈 If you keep teasing me, I might just fall harder.",
-  "🔥 You’re dangerous for my heart… but I love it.",
-  "😉 One word from you and I’d cross any distance.",
-  "😍 You’re not just attractive, you’re magnetic.",
-  "😘 Stop being perfect, you’re spoiling me.",
-  "🥵 I don’t need caffeine, your vibe energizes me.",
-  "💋 If texts could touch, you’d feel me right now.",
-  "❤️ You’re my type of chaos.",
-  "😏 Keep being hot, I dare you.",
-  "💌 Flirting with you should come with a warning sign.",
-  "🥰 I like the way you make me forget everything else.",
-  "🔥 You’d look even better next to me.",
-  "😉 Admit it, you’ve been waiting for my message.",
-  "😘 You + late night talks = perfection.",
-  "💖 I hope you know how attractive you are.",
-  "😈 If hearts were currency, you’d make me broke.",
-  "😍 Can you stop being my constant distraction?",
-  "❤️ Your smile could outshine the sun.",
-  "😘 If you were here, I’d never let you leave.",
-  "💋 Every flirty thought leads back to you.",
-  "😏 Talking to you is like flirting with destiny.",
-  "🔥 Careful… you might just become my addiction.",
-  "😉 I bet you look amazing right now.",
-  "🥰 I want to be the reason you blush randomly.",
-  "💖 You’re effortlessly hot.",
-  "😍 Even my best daydreams can’t compete with you.",
-  "😘 You’ve stolen my focus, and I don’t want it back.",
-  "😎 You’re not just cute, you’re dangerously charming.",
-  "❤️ Do you know how attractive your vibe is?",
-  "🔥 If I had one wish, it would be to hold you tight.",
-  "😈 I’d get in trouble just to keep flirting with you.",
-  "😉 I think I’m starting to like this ‘us’ thing.",
-  "😘 If hearts could talk, mine would be screaming your name.",
-  "💋 I wish I could kiss this distance away.",
-  "😍 You make my ordinary day feel extraordinary.",
-  "🥰 I’d rather flirt with you than with anyone else.",
-  "💖 Can you be my guilty pleasure forever?",
-  "😏 Your charm should be illegal.",
-  "🔥 I could spend hours just admiring you.",
-  "😘 Don’t tempt me, I fall easily for your type.",
-  "😉 Stop making me crave your attention 24/7.",
-  "❤️ You’re my new addiction.",
-  "💌 Your vibe is all I need today.",
-  "😈 I want to make you smile in ways only I can.",
-  "😍 Even when I’m busy, my mind sneaks back to you.",
-  "🥵 You’re the fantasy I don’t want to end.",
-  "💖 I think we’re dangerously compatible.",
-  "😘 If looks could kill, I’d already be gone.",
-  "😉 I want to be your favorite hello and hardest goodbye.",
-  "😏 Are you trying to steal my heart? Because it’s working.",
-  "🔥 One text from you can light up my mood instantly.",
-  "💋 You’ve got me hooked and I’m not complaining.",
-  "❤️ You’re way too good to be just a crush.",
-  "🥰 Your charm has me falling faster every day.",
-  "😍 You’re like a flirty melody stuck in my head.",
-  "😘 Guess what? I like you. A LOT.",
-  "😎 You’re trouble, but the sweet kind.",
-  "💌 I want you more than my next breath.",
-  "😉 I don’t flirt with everyone… just my favorites. Like you 😉",
-  "🔥 You’re hot enough to melt my bad mood instantly.",
-  "😈 If we were in the same room right now… sparks would fly.",
-  "💖 You’re the kind of person I want to text at 2 AM.",
-  "😘 Your name looks way too good on my screen.",
-  "🥰 If I’m blushing, it’s all your fault.",
-  "😍 You’d look perfect holding my hand.",
-  "❤️ Stop stealing my thoughts, I can’t focus.",
-  "💋 If you knew what I was thinking… you’d blush too.",
-  "😏 Your vibe has me craving more.",
-  "😉 You’re my favorite kind of distraction.",
-  "🔥 You’re proof that temptation exists.",
-  "😘 I bet you smile reading my texts… and I love that.",
-  "💖 If I were brave enough, I’d confess more than just flirting.",
-  "🥵 You should come with a warning: *Too Attractive*.",
-  "😎 You’re the reason I refresh my chats so often.",
-  "😍 Can you be mine already?",
-  "❤️ I want more than just messages with you.",
-  "😘 You’re unforgettable, and that’s dangerous.",
-  "😉 Stop teasing, or I’ll flirt harder.",
-  "💌 You’re my sweet obsession.",
-  "🔥 My mood: craving you.",
-  "🥰 Even my favorite song doesn’t hit like your vibe.",
-  "💖 You have me wrapped around your smile.",
-  "😏 You’re a flirty daydream come true.",
-  "😘 Your energy is magnetic, I can’t resist.",
-  "😍 If you’re trouble, I want double.",
-  "❤️ I’m falling, and it’s your fault.",
-  "💋 You make me want to say all the naughty things.",
-  "😉 My favorite thought? You.",
-  "😈 Flirting with you feels too natural.",
-  "🔥 Your charm is dangerous for my peace.",
-  "😘 You’d look perfect lost in my arms.",
-  "🥰 Even your silence flirts with me.",
-  "💖 I want you. That’s it, that’s the text.",
-  "😏 You light up my boring day instantly.",
-  "😍 Are you always this attractive, or just when I notice?",
-  "❤️ You make ordinary chats extraordinary.",
-  "😉 I want to be the reason behind your smirk.",
-  "😘 Your vibe fits perfectly with mine.",
-  "🔥 You’re the spark I didn’t know I needed.",
-  "💌 You’re hotter than my morning coffee.",
-  "🥵 You’re on my mind, and I don’t mind at all.",
-  "💖 Admit it, we’d look great together.",
-  "😎 You’re irresistible, and I like it.",
-  "😘 Your smile is my new favorite filter.",
-  "😍 Stop being so attractive, it’s distracting.",
-  "❤️ If you’re a dream, don’t wake me up.",
-  "😉 You’d look better in my arms.",
-  "💋 Just imagining you makes me blush.",
-  "🔥 My type? Only you.",
-  "😏 I’m not obsessed… just highly interested 😉",
-  "🥰 Every text from you feels like a hug.",
-  "💖 You’ve ruined all my other crushes.",
-  "😘 I bet you look good even while typing.",
-  "😍 You’re not just hot, you’re fireproof.",
-  "❤️ My favorite pastime? Thinking of you.",
-  "😉 You’re my daily dose of butterflies.",
-  "🔥 If only flirting could teleport us together.",
-  "💌 Talking to you feels like cheating on boredom.",
-  "🥵 I can’t tell if I want to flirt or kiss you more.",
-  "😈 You’ve got that dangerous charm I love.",
-  "😘 Just one more reason to like you: everything.",
-  "💖 You’re the plot twist my life needed.",
-  "😍 If only I could screenshot the way you make me feel.",
-  "❤️ You’re too attractive for my own good.",
-  "😏 Can I keep flirting with you forever?",
-  "🔥 Your smile should come with a fan.",
-  "😉 You + me = perfect trouble.",
-  "😘 Don’t stop being this irresistible.",
-  "🥰 You make my day feel lighter.",
-  "💌 You’re the spark in my boring hours.",
-  "😍 You’re so attractive, I forgot what I was typing.",
-  "❤️ You’re magnetic, and I’m stuck.",
-  "😎 If hotness were a crime, you’d be guilty.",
-  "💋 My mood improves instantly when you text.",
-  "😘 I don’t need stars when you light up my chat.",
-  "🔥 Can you stop making my heart race?",
-  "😉 You’re exactly my weakness.",
-  "💖 I want to be the one you think of at night.",
-  "🥵 Flirting with you feels too easy.",
-  "😏 You’d look perfect stealing my hoodie.",
-  "❤️ Admit it—we’d be great together.",
-  "😘 I bet you look hotter than my imagination.",
-  "😍 You’re more attractive than my favorite celeb.",
-  "💌 Don’t tempt me, I might just fall for you.",
-  "🔥 You’re too good at this charm game.",
-  "😉 I like you more than I planned.",
-  "😘 If I could, I’d make you mine already.",
-  "🥰 You’re everything I didn’t know I needed.",
-  "❤️ Stop making my daydreams so obvious.",
-  "💖 You’re too addictive for my own good.",
-  "😈 If I flirt harder, will you surrender?",
-  "🔥 You’re hotter than any filter.",
-  "😘 My favorite thing about today? You.",
-  "😍 If you were here, I’d never look away.",
-  "😉 You’ve got me hooked.",
-  "💋 One day, I’ll steal that kiss.",
-  "❤️ You’re dangerously perfect.",
-  "🥵 My heart skips every time you text.",
-  "💖 You’re officially my crush upgrade.",
-  "😏 Too attractive to ignore, too interesting to stop.",
-];
+    const flirtyTexts = [
+      "😏 Thinking of you right now…",
+      "💋 I wish I could whisper something naughty in your ear.",
+      "🔥 You make my heart race every time I think of you.",
+      "😘 If only you were here… I’d never let you go.",
+      "😉 Don’t blush, but you looked really hot in my dream last night.",
+      "❤️ I could get addicted to your vibes.",
+      "🥵 Just imagining us together gives me butterflies.",
+      "💖 Can I be your favorite distraction?",
+      "😈 Careful… I might just steal your heart.",
+      "👀 I bet you smile reading this… and that’s all I wanted.",
+      "🤭 You look like trouble… but the kind I want.",
+      "💌 Every message from you feels like a secret love note.",
+      "✨ I’d never get tired of your energy.",
+      "🔥 I like the way you make me lose focus.",
+      "😘 Tell me honestly… do you think about me too?",
+      "😎 If you were here, I’d probably forget how to behave.",
+      "🥰 You’re way too addictive for my peace of mind.",
+      "💋 If flirty texts were kisses, you’d be drowning by now.",
+      "😍 You make ordinary moments feel extraordinary.",
+      "🫦 If I start flirting harder, will you stop me? (please don’t 😉)",
+      "😉 I’d choose you over sleep any day.",
+      "😏 You’re the reason my phone lights up and my heart skips.",
+      "🔥 You could set my whole mood on fire with just one word.",
+      "😘 Admit it, you like me a little too much.",
+      "🥵 Thinking of your smile… dangerous move for my sanity.",
+      "❤️ If flirting is a game, I’d play only with you.",
+      "💌 Do you know how attractive you are, or should I remind you?",
+      "😈 One look from you and I’m done for.",
+      "😍 If your texts feel this good, imagine your hugs.",
+      "😘 If I were with you, we’d never stop smiling.",
+      "😉 You’re my favorite notification, every single time.",
+      "🔥 My type? Easy—just you.",
+      "💖 Stop being so irresistible, it’s distracting.",
+      "🫦 I might be blushing, but it’s your fault.",
+      "😏 You + me = a dangerous combo.",
+      "😘 Your vibe? Exactly my weakness.",
+      "🥰 You’re my daily dose of butterflies.",
+      "💌 Warning: you make my heart skip beats.",
+      "😉 If flirting were illegal, we’d be in trouble.",
+      "😎 You make ordinary chats feel like sparks.",
+      "❤️ I want to be the reason you smile at your phone.",
+      "🔥 I like the way you tease my thoughts.",
+      "😘 You’re the highlight of my day.",
+      "😍 If only you knew how attractive you look right now in my head.",
+      "💖 I’m not addicted to chatting, I’m addicted to YOU.",
+      "😉 I bet you’d look even better blushing.",
+      "😏 You have no idea how much I enjoy talking to you.",
+      "🥵 Stop making me want you more every second.",
+      "💋 I’d send you a thousand flirty texts if it kept you smiling.",
+      "😘 Tell me… when do I get to steal a hug?",
+      "🔥 You look like the kind of trouble worth risking everything for.",
+      "😍 If we were emojis, we’d be 🔥❤️😘 together.",
+      "😉 You’re too hot to handle, but I want to anyway.",
+      "💌 Just imagining your voice is enough to melt me.",
+      "🥰 I think you just became my favorite daydream.",
+      "😏 You don’t even try, and yet you make me weak.",
+      "😘 If I could, I’d keep you all to myself.",
+      "❤️ Can I borrow your smile? I’ll give it back with interest.",
+      "💖 I want to be the thought that makes you blush unexpectedly.",
+      "😈 If you keep teasing me, I might just fall harder.",
+      "🔥 You’re dangerous for my heart… but I love it.",
+      "😉 One word from you and I’d cross any distance.",
+      "😍 You’re not just attractive, you’re magnetic.",
+      "😘 Stop being perfect, you’re spoiling me.",
+      "🥵 I don’t need caffeine, your vibe energizes me.",
+      "💋 If texts could touch, you’d feel me right now.",
+      "❤️ You’re my type of chaos.",
+      "😏 Keep being hot, I dare you.",
+      "💌 Flirting with you should come with a warning sign.",
+      "🥰 I like the way you make me forget everything else.",
+      "🔥 You’d look even better next to me.",
+      "😉 Admit it, you’ve been waiting for my message.",
+      "😘 You + late night talks = perfection.",
+      "💖 I hope you know how attractive you are.",
+      "😈 If hearts were currency, you’d make me broke.",
+      "😍 Can you stop being my constant distraction?",
+      "❤️ Your smile could outshine the sun.",
+      "😘 If you were here, I’d never let you leave.",
+      "💋 Every flirty thought leads back to you.",
+      "😏 Talking to you is like flirting with destiny.",
+      "🔥 Careful… you might just become my addiction.",
+      "😉 I bet you look amazing right now.",
+      "🥰 I want to be the reason you blush randomly.",
+      "💖 You’re effortlessly hot.",
+      "😍 Even my best daydreams can’t compete with you.",
+      "😘 You’ve stolen my focus, and I don’t want it back.",
+      "😎 You’re not just cute, you’re dangerously charming.",
+      "❤️ Do you know how attractive your vibe is?",
+      "🔥 If I had one wish, it would be to hold you tight.",
+      "😈 I’d get in trouble just to keep flirting with you.",
+      "😉 I think I’m starting to like this ‘us’ thing.",
+      "😘 If hearts could talk, mine would be screaming your name.",
+      "💋 I wish I could kiss this distance away.",
+      "😍 You make my ordinary day feel extraordinary.",
+      "🥰 I’d rather flirt with you than with anyone else.",
+      "💖 Can you be my guilty pleasure forever?",
+      "😏 Your charm should be illegal.",
+      "🔥 I could spend hours just admiring you.",
+      "😘 Don’t tempt me, I fall easily for your type.",
+      "😉 Stop making me crave your attention 24/7.",
+      "❤️ You’re my new addiction.",
+      "💌 Your vibe is all I need today.",
+      "😈 I want to make you smile in ways only I can.",
+      "😍 Even when I’m busy, my mind sneaks back to you.",
+      "🥵 You’re the fantasy I don’t want to end.",
+      "💖 I think we’re dangerously compatible.",
+      "😘 If looks could kill, I’d already be gone.",
+      "😉 I want to be your favorite hello and hardest goodbye.",
+      "😏 Are you trying to steal my heart? Because it’s working.",
+      "🔥 One text from you can light up my mood instantly.",
+      "💋 You’ve got me hooked and I’m not complaining.",
+      "❤️ You’re way too good to be just a crush.",
+      "🥰 Your charm has me falling faster every day.",
+      "😍 You’re like a flirty melody stuck in my head.",
+      "😘 Guess what? I like you. A LOT.",
+      "😎 You’re trouble, but the sweet kind.",
+      "💌 I want you more than my next breath.",
+      "😉 I don’t flirt with everyone… just my favorites. Like you 😉",
+      "🔥 You’re hot enough to melt my bad mood instantly.",
+      "😈 If we were in the same room right now… sparks would fly.",
+      "💖 You’re the kind of person I want to text at 2 AM.",
+      "😘 Your name looks way too good on my screen.",
+      "🥰 If I’m blushing, it’s all your fault.",
+      "😍 You’d look perfect holding my hand.",
+      "❤️ Stop stealing my thoughts, I can’t focus.",
+      "💋 If you knew what I was thinking… you’d blush too.",
+      "😏 Your vibe has me craving more.",
+      "😉 You’re my favorite kind of distraction.",
+      "🔥 You’re proof that temptation exists.",
+      "😘 I bet you smile reading my texts… and I love that.",
+      "💖 If I were brave enough, I’d confess more than just flirting.",
+      "🥵 You should come with a warning: *Too Attractive*.",
+      "😎 You’re the reason I refresh my chats so often.",
+      "😍 Can you be mine already?",
+      "❤️ I want more than just messages with you.",
+      "😘 You’re unforgettable, and that’s dangerous.",
+      "😉 Stop teasing, or I’ll flirt harder.",
+      "💌 You’re my sweet obsession.",
+      "🔥 My mood: craving you.",
+      "🥰 Even my favorite song doesn’t hit like your vibe.",
+      "💖 You have me wrapped around your smile.",
+      "😏 You’re a flirty daydream come true.",
+      "😘 Your energy is magnetic, I can’t resist.",
+      "😍 If you’re trouble, I want double.",
+      "❤️ I’m falling, and it’s your fault.",
+      "💋 You make me want to say all the naughty things.",
+      "😉 My favorite thought? You.",
+      "😈 Flirting with you feels too natural.",
+      "🔥 Your charm is dangerous for my peace.",
+      "😘 You’d look perfect lost in my arms.",
+      "🥰 Even your silence flirts with me.",
+      "💖 I want you. That’s it, that’s the text.",
+      "😏 You light up my boring day instantly.",
+      "😍 Are you always this attractive, or just when I notice?",
+      "❤️ You make ordinary chats extraordinary.",
+      "😉 I want to be the reason behind your smirk.",
+      "😘 Your vibe fits perfectly with mine.",
+      "🔥 You’re the spark I didn’t know I needed.",
+      "💌 You’re hotter than my morning coffee.",
+      "🥵 You’re on my mind, and I don’t mind at all.",
+      "💖 Admit it, we’d look great together.",
+      "😎 You’re irresistible, and I like it.",
+      "😘 Your smile is my new favorite filter.",
+      "😍 Stop being so attractive, it’s distracting.",
+      "❤️ If you’re a dream, don’t wake me up.",
+      "😉 You’d look better in my arms.",
+      "💋 Just imagining you makes me blush.",
+      "🔥 My type? Only you.",
+      "😏 I’m not obsessed… just highly interested 😉",
+      "🥰 Every text from you feels like a hug.",
+      "💖 You’ve ruined all my other crushes.",
+      "😘 I bet you look good even while typing.",
+      "😍 You’re not just hot, you’re fireproof.",
+      "❤️ My favorite pastime? Thinking of you.",
+      "😉 You’re my daily dose of butterflies.",
+      "🔥 If only flirting could teleport us together.",
+      "💌 Talking to you feels like cheating on boredom.",
+      "🥵 I can’t tell if I want to flirt or kiss you more.",
+      "😈 You’ve got that dangerous charm I love.",
+      "😘 Just one more reason to like you: everything.",
+      "💖 You’re the plot twist my life needed.",
+      "😍 If only I could screenshot the way you make me feel.",
+      "❤️ You’re too attractive for my own good.",
+      "😏 Can I keep flirting with you forever?",
+      "🔥 Your smile should come with a fan.",
+      "😉 You + me = perfect trouble.",
+      "😘 Don’t stop being this irresistible.",
+      "🥰 You make my day feel lighter.",
+      "💌 You’re the spark in my boring hours.",
+      "😍 You’re so attractive, I forgot what I was typing.",
+      "❤️ You’re magnetic, and I’m stuck.",
+      "😎 If hotness were a crime, you’d be guilty.",
+      "💋 My mood improves instantly when you text.",
+      "😘 I don’t need stars when you light up my chat.",
+      "🔥 Can you stop making my heart race?",
+      "😉 You’re exactly my weakness.",
+      "💖 I want to be the one you think of at night.",
+      "🥵 Flirting with you feels too easy.",
+      "😏 You’d look perfect stealing my hoodie.",
+      "❤️ Admit it—we’d be great together.",
+      "😘 I bet you look hotter than my imagination.",
+      "😍 You’re more attractive than my favorite celeb.",
+      "💌 Don’t tempt me, I might just fall for you.",
+      "🔥 You’re too good at this charm game.",
+      "😉 I like you more than I planned.",
+      "😘 If I could, I’d make you mine already.",
+      "🥰 You’re everything I didn’t know I needed.",
+      "❤️ Stop making my daydreams so obvious.",
+      "💖 You’re too addictive for my own good.",
+      "😈 If I flirt harder, will you surrender?",
+      "🔥 You’re hotter than any filter.",
+      "😘 My favorite thing about today? You.",
+      "😍 If you were here, I’d never look away.",
+      "😉 You’ve got me hooked.",
+      "💋 One day, I’ll steal that kiss.",
+      "❤️ You’re dangerously perfect.",
+      "🥵 My heart skips every time you text.",
+      "💖 You’re officially my crush upgrade.",
+      "😏 Too attractive to ignore, too interesting to stop.",
+    ];
 
 
     const randomIndex = Math.floor(Math.random() * flirtyTexts.length);
