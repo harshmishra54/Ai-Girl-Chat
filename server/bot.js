@@ -1,5 +1,6 @@
 const TelegramBot = require("node-telegram-bot-api");
 const axios = require("axios");
+const translate = require("./utils/translator");
 const translateWithSarvam = require("./utils/sarvamTranslator");
 const express = require("express");
 const path = require("path");
