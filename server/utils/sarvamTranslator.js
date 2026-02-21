@@ -17,7 +17,7 @@ async function translateWithSarvam(text) {
 
                 // Example config — adjust language if needed
                 source_language: "en",
-                target_language: "en",
+                target_language: "hi",
 
                 // 🔥 STYLE INSTRUCTION
                 style_prompt:
