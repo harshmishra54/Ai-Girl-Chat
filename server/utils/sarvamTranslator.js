@@ -7,40 +7,41 @@ async function translateWithSarvam(text) {
         console.log("========== SARVAM REQUEST ==========");
         console.log("Input:", text);
 
-        const payload = {
-            input: text,
-            source_language: "en",
-            target_language: "hi",
-        };
-
         const response = await axios.post(
-            "https://api.sarvam.ai/translate", // ✅ FIXED ENDPOINT
-            payload,
+            "https://api.sarvam.ai/translate",
+            {
+                input: text,
+                source_language_code: "auto",
+                target_language_code: "hi-IN", // ✅ Hindi
+            },
             {
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${SARVAM_API_KEY}`,
+                    "api-subscription-key": SARVAM_API_KEY, // ✅ IMPORTANT
                 },
+                timeout: 20000,
             }
         );
 
         console.log("========== SARVAM RESPONSE ==========");
-        console.log(response.data);
+        console.log(JSON.stringify(response.data, null, 2));
 
+        // Sarvam response field
         const translated =
             response.data?.translated_text ||
-            response.data?.output;
+            response.data?.output?.[0]?.translated_text;
 
-        return translated || text;
+        if (!translated) {
+            console.warn("⚠️ Translation missing, fallback used");
+            return text;
+        }
 
+        console.log("Translated:", translated);
+
+        return translated;
     } catch (err) {
         console.error("========== SARVAM ERROR ==========");
-
-        if (err.response) {
-            console.error(err.response.status, err.response.data);
-        } else {
-            console.error(err.message);
-        }
+        console.error(err.response?.data || err.message);
 
         return text; // fallback
     }
