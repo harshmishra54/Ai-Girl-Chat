@@ -1,5 +1,4 @@
 const TelegramBot = require("node-telegram-bot-api");
-const translateWithSarvam = require("./utils/sarvamTranslator");
 const axios = require("axios");
 const express = require("express");
 const path = require("path");
@@ -465,17 +464,14 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
 
     const aiReply = await getAIReply(conversationContext, user);
 
-    // ✅ Translate + style using Sarvam
-    const finalReply = await translateWithSarvam(aiReply);
-
     await MessageLog.create({
       telegramId: chatId,
       message: text,
-      response: finalReply,
+      response: aiReply,
       timestamp: new Date(),
     });
 
-    await bot.sendMessage(chatId, finalReply);
+    await bot.sendMessage(chatId, aiReply);
 
     // const tempDir = path.join(__dirname, "temp");
     // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
