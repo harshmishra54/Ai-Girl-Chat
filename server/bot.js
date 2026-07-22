@@ -10,8 +10,15 @@ const mongoose = require("mongoose");
 const Razorpay = require("razorpay");
 // const generateTTS = require('./utils/tts');
 // const convertMp3ToOgg = require('./utils/convertAudio');
-const crypto = require("crypto");
 const Image = require("./models/Image"); // Adjust the path if different
+const User = require("./models/User");
+const MessageLog = require("./models/MessageLog");
+const Payment = require("./models/Payment");
+const PaymentLink = require("./models/PaymentLink");
+const ProcessedUpdate = require("./models/ProcessedUpdate");
+const { activatePayment, expireSubscriptionIfNeeded } = require("./utils/paymentService");
+const { PLANS, getPlan, hasActiveSubscription, formatExpiry } = require("./utils/subscription");
+const { verifyWebhookSignature, getCapturedPayment } = require("./utils/razorpayWebhook");
 // ===== UI OPTIONS =====
 const moods = [
   "💖 Romantic",
@@ -59,13 +66,22 @@ bot.setMyCommands([
   { command: "setmood", description: "💖 Set Ayesha's mood" },
   { command: "setscene", description: "🎭 Set roleplay scene" },
   { command: "setname", description: "📝 Set your name" },
+  { command: "intensity", description: "🌶 Set flirting intensity" },
+  { command: "plans", description: "💎 View subscription plans" },
+  { command: "subscription", description: "⏳ Check subscription" },
+  { command: "notifications", description: "🔔 Manage messages" },
+  { command: "deleteaccount", description: "🗑 Delete your data" },
   { command: "top", description: "🏆 Top leaderboard members" },
   { command: "reset", description: "🧹 Reset chat memory" }, // <-- New command
 ]);
 
 
 const app = express();
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buffer) => {
+    if (req.originalUrl === "/razorpay/webhook") req.rawBody = Buffer.from(buffer);
+  },
+}));
 app.get("/", (req, res) => {
   res.send("✅ Telegram Bot Server is Running");
 });
@@ -75,54 +91,6 @@ app.use(cors({
   credentials: true
 }));
 
-
-// ================= SCHEMAS =================
-const userSchema = new mongoose.Schema({
-  telegramId: String,
-  email: { type: String, unique: true, sparse: true },
-  paymentVerified: { type: Boolean, default: false },
-  paymentAmount: Number, // Add this
-  paymentVerifiedAt: Date, // Add this
-  paymentId: String,
-  planExpiresAt: Date,
-  freeChatStart: { type: Date, default: Date.now },
-  name: { type: String },
-  mood: { type: String, default: "💖 Romantic" },
-  scene: { type: String },
-
-
-});
-const User = mongoose.model("User", userSchema);
-
-const messageSchema = new mongoose.Schema({
-  telegramId: String,
-  message: String,
-  response: String,
-  timestamp: { type: Date, default: Date.now },
-});
-const MessageLog = mongoose.model("MessageLog", messageSchema);
-const paymentSchema = new mongoose.Schema({
-  paymentId: { type: String, unique: true },
-  telegramId: String,
-  amount: Number,
-  verifiedAt: Date,
-  raw: Object, // Optional: store full Razorpay response for logs/audits
-});
-
-const Payment = mongoose.model("Payment", paymentSchema);
-
-const paymentLinkSchema = new mongoose.Schema(
-  {
-    telegramId: { type: String },
-    amount: { type: Number },
-    durationLabel: { type: String },
-    link: { type: String },
-    createdAt: { type: Date, default: Date.now },
-    expiresAt: { type: Date },
-  },
-  { timestamps: true }
-);
-const PaymentLink = mongoose.model("PaymentLink", paymentLinkSchema)
 
 // Payment Link Creation
 async function createPaymentLink(telegramId, amount, durationLabel) {
@@ -144,7 +112,7 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
     const razorpayLink = await razorpay.paymentLink.create({
       amount: amount * 100,
       currency: "INR",
-      description: `AI Resume Builder - ${durationLabel}`,
+      description: `AI Girl Chat - ${durationLabel}`,
       customer: {
         name: `Telegram User ${telegramId}`,
         email: `${telegramId}@telegram.com`,
@@ -173,9 +141,37 @@ async function createPaymentLink(telegramId, amount, durationLabel) {
   }
 }
 
+async function sendPlans(chatId) {
+  const links = await Promise.all(
+    Object.values(PLANS).map(async (plan) => ({
+      ...plan,
+      link: await createPaymentLink(chatId, plan.amount, plan.label),
+    }))
+  );
+  if (links.some((plan) => !plan.link)) {
+    await bot.sendMessage(chatId, "⚠️ Could not generate payment links. Please try again later.");
+    return;
+  }
+  const lines = links.map((plan) => `💡 *${plan.label}* - ₹${plan.amount}\n🔗 ${plan.link}`);
+  await bot.sendMessage(
+    chatId,
+    `💎 *Choose your plan*\n\n${lines.join("\n\n")}\n\nPayment activates automatically. If delayed, use \`/verify payment_id\`.`,
+    { parse_mode: "Markdown" }
+  );
+}
+
 // ================= TELEGRAM WEBHOOK =================
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
+
+  if (Number.isInteger(update.update_id)) {
+    try {
+      await ProcessedUpdate.create({ updateId: update.update_id });
+    } catch (error) {
+      if (error?.code === 11000) return res.sendStatus(200);
+      throw error;
+    }
+  }
 
 
   const chatId = update.message?.chat?.id;
@@ -187,7 +183,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (!chatId || !text) return res.sendStatus(200);
 
-  let user = await User.findOne({ telegramId: chatId });
+  let user = await User.findOne({ telegramId: String(chatId) });
   let isNewUser = false;
 
   if (!user) {
@@ -196,7 +192,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       : `${chatId}@anon.com`;
 
     user = await User.create({
-      telegramId: chatId,
+      telegramId: String(chatId),
       email,
       freeChatStart: new Date(),
     });
@@ -224,27 +220,17 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   }
   if (text === "📸 Send me a Photo" || text === "/photo") {
     const now = new Date();
-    const user = await User.findOne({ telegramId: chatId });
+    const user = await User.findOne({ telegramId: String(chatId) });
 
-    let allowed = user && user.telegramId === "1469113335"; // owner
-    if (user?.paymentVerified && user.paymentVerifiedAt) {
-      const diffH = (now - new Date(user.paymentVerifiedAt)) / (1000 * 60 * 60);
-      if (
-        (user.paymentAmount === 20 && diffH <= 24) ||
-        (user.paymentAmount === 59 && diffH <= 168) ||
-        (user.paymentAmount === 99 && diffH <= 720)
-      ) allowed = true;
-    }
+    let allowed = user && user.telegramId === "1469113335";
+    if (hasActiveSubscription(user, now)) allowed = true;
 
     if (!user?.paymentVerified && user && (now - new Date(user.freeChatStart)) / 60000 <= 10) {
       allowed = true;
     }
 
     if (!allowed) {
-      const link1 = await createPaymentLink(chatId, 20, "1 Day");
-      const link2 = await createPaymentLink(chatId, 59, "7 Days");
-      const link3 = await createPaymentLink(chatId, 99, "30 Days");
-      await bot.sendMessage(chatId, `💋 Want to unlock my hot photos?\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`);
+      await sendPlans(chatId);
       return res.sendStatus(200);
     }
 
@@ -266,8 +252,13 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       chatId,
       "🆘 *Available Commands:*\n" +
       "/start - Get started\n" +
-      "/verify payment_id - Verify your payment\n" +
-      // "/help - Show this help message",
+      "/plans - View plans\n" +
+      "/subscription - Check access\n" +
+      "/intensity - Set the chat vibe\n" +
+      "/notifications on|off - Optional messages\n" +
+      "/reset - Delete chat memory\n" +
+      "/deleteaccount - Delete your profile\n" +
+      "/verify payment_id - Manual payment fallback",
       { parse_mode: "Markdown" }
     );
     return res.sendStatus(200);
@@ -281,6 +272,67 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       await user.save();
       await bot.sendMessage(chatId, `✅ Got it, I’ll call you *${name}* now 😉`, { parse_mode: "Markdown" });
     }
+    return res.sendStatus(200);
+  }
+
+  if (text.startsWith("/intensity")) {
+    const requestedLevel = text.split(" ")[1]?.toLowerCase();
+    const allowedLevels = ["adaptive", "sweet", "flirty", "spicy"];
+
+    if (!allowedLevels.includes(requestedLevel)) {
+      await bot.sendMessage(
+        chatId,
+        "🌶 Choose your vibe:\n`/intensity sweet`\n`/intensity flirty`\n`/intensity spicy`\n`/intensity adaptive`",
+        { parse_mode: "Markdown" }
+      );
+    } else {
+      user.flirtLevel = requestedLevel;
+      await user.save();
+      await bot.sendMessage(chatId, `Vibe set to *${requestedLevel}* 😏`, { parse_mode: "Markdown" });
+    }
+    return res.sendStatus(200);
+  }
+
+  if (text === "/plans") {
+    await sendPlans(chatId);
+    return res.sendStatus(200);
+  }
+
+  if (text === "/subscription") {
+    await expireSubscriptionIfNeeded(user, now);
+    if (hasActiveSubscription(user, now)) {
+      await bot.sendMessage(chatId, `✅ Your plan is active until *${formatExpiry(user.planExpiresAt)}*.`, { parse_mode: "Markdown" });
+    } else {
+      const trialMinutes = Math.max(0, 10 - Math.floor((now - new Date(user.freeChatStart)) / 60000));
+      await bot.sendMessage(chatId, trialMinutes > 0
+        ? `⏳ Free trial remaining: about ${trialMinutes} minute(s).`
+        : "Your free trial has ended. Use /plans to continue.");
+    }
+    return res.sendStatus(200);
+  }
+
+  if (text.startsWith("/notifications")) {
+    const setting = text.split(" ")[1]?.toLowerCase();
+    if (!["on", "off"].includes(setting)) {
+      await bot.sendMessage(chatId, "Use `/notifications on` or `/notifications off`.", { parse_mode: "Markdown" });
+    } else {
+      user.notificationsEnabled = setting === "on";
+      await user.save();
+      await bot.sendMessage(chatId, `Optional messages are now ${setting === "on" ? "enabled 🔔" : "disabled 🔕"}.`);
+    }
+    return res.sendStatus(200);
+  }
+
+  if (text === "/deleteaccount") {
+    await bot.sendMessage(chatId, "This permanently deletes your profile and chat history. Confirm with `/deleteaccount confirm`.", { parse_mode: "Markdown" });
+    return res.sendStatus(200);
+  }
+
+  if (text === "/deleteaccount confirm") {
+    await MessageLog.deleteMany({ telegramId: String(chatId) });
+    await PaymentLink.deleteMany({ telegramId: String(chatId) });
+    await User.deleteOne({ telegramId: String(chatId) });
+    await bot.sendMessage(chatId, "Your profile and conversation history have been deleted. Payment audit records are retained for transaction compliance.");
     return res.sendStatus(200);
   }
 
@@ -406,7 +458,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     if (result.success) {
       const amount = result.amount / 100;
-      const now = new Date();
+      const plan = getPlan(amount);
 
       const notesTelegramId = result.notes?.telegramId;
       if (notesTelegramId !== chatId.toString()) {
@@ -416,29 +468,23 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         );
         return res.sendStatus(200);
       }
+      if (!plan) {
+        await bot.sendMessage(chatId, "❌ This payment amount does not match an available plan. Please contact support.");
+        return res.sendStatus(200);
+      }
 
-      user.paymentVerified = true;
-      user.paymentId = paymentId;
-      user.paymentAmount = amount;
-      user.paymentVerifiedAt = now;
-      await user.save();
-
-      await Payment.create({
+      const activation = await activatePayment({
         paymentId,
-        telegramId: chatId.toString(),
+        telegramId: chatId,
         amount,
-        verifiedAt: now,
-        raw: result,
+        verifiedAt: new Date(),
+        source: "manual",
+        raw: result.raw,
       });
-
-      let expiry = new Date(now);
-      if (amount === 20) expiry.setHours(expiry.getHours() + 24);
-      else if (amount === 59) expiry.setHours(expiry.getHours() + 168);
-      else if (amount === 99) expiry.setHours(expiry.getHours() + 720);
 
       await bot.sendMessage(
         chatId,
-        `✅ Payment of ₹${amount} verified!\nYour access is active until *${expiry.toDateString()}*.`,
+        `✅ Payment of ₹${amount} verified!\nYour access is active until *${formatExpiry(activation.user.planExpiresAt)}*.`,
         { parse_mode: "Markdown" }
       );
     } else {
@@ -456,23 +502,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     const minutesUsed = (now - new Date(user.freeChatStart)) / 60000;
 
     if (minutesUsed > 10) {
-      const link1 = await createPaymentLink(chatId, 20, "1 Day");
-      const link2 = await createPaymentLink(chatId, 59, "7 Days");
-      const link3 = await createPaymentLink(chatId, 99, "30 Days");
-
-      if (link1 && link2 && link3) {
-        await bot.sendMessage(
-          chatId,
-          `⏳ *Oops 😢 Time’s up baby...
-Want me to stay and chat with you more? Unlock full access now 💋 unlimited photos and Private chats with me .*\n\nChoose a plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nAfter payment, type \`/verify payment_id\` to activate.`,
-          { parse_mode: "Markdown" }
-        );
-      } else {
-        await bot.sendMessage(
-          chatId,
-          "⚠️ Could not generate payment links. Please try again later."
-        );
-      }
+      await bot.sendMessage(chatId, "⏳ Your free trial has ended. Choose a plan to continue chatting and viewing photos.");
+      await sendPlans(chatId);
       return res.sendStatus(200);
     }
 
@@ -486,42 +517,11 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
     }
   }
 
-  //// ===== CHECK PLAN BASED ON PAYMENT TIMESTAMP =====
+  //// ===== CHECK SUBSCRIPTION EXPIRY =====
   if (!isOwner && user.paymentVerified) {
-    const now = new Date();
-    const verifiedAt = new Date(user.paymentVerifiedAt);
-    const diffHours = (now - verifiedAt) / (1000 * 60 * 60);
-
-    let planExpired = false;
-
-    if (user.paymentAmount === 20 && diffHours > 24) planExpired = true;
-    else if (user.paymentAmount === 59 && diffHours > 168) planExpired = true;
-    else if (user.paymentAmount === 99 && diffHours > 720) planExpired = true;
-
-    if (planExpired) {
-      user.paymentVerified = false;
-      user.paymentId = null;
-      user.paymentAmount = null;
-      user.paymentVerifiedAt = null;
-      await user.save();
-
-      const link1 = await createPaymentLink(chatId, 20, "1 Day");
-      const link2 = await createPaymentLink(chatId, 59, "7 Days");
-      const link3 = await createPaymentLink(chatId, 99, "30 Days");
-
-      if (link1 && link2 && link3) {
-        await bot.sendMessage(
-          chatId,
-          `⏳ *Your plan has expired.*\n\nChoose a new plan:\n\n💡 *1 Day* - ₹20\n🔗 ${link1}\n\n💡 *7 Days* - ₹59\n🔗 ${link2}\n\n💡 *30 Days* - ₹99\n🔗 ${link3}\n\nType \`/verify payment_id\` after payment.`,
-          { parse_mode: "Markdown" }
-        );
-      } else {
-        await bot.sendMessage(
-          chatId,
-          "⚠️ Could not generate payment links. Please try again later."
-        );
-      }
-
+    if (await expireSubscriptionIfNeeded(user, now)) {
+      await bot.sendMessage(chatId, "⏳ Your plan has expired. Choose a new plan to continue.");
+      await sendPlans(chatId);
       return res.sendStatus(200);
     }
   }
@@ -530,23 +530,14 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
   try {
     await bot.sendChatAction(chatId, "typing");
 
-    // ====== AI CHAT HANDLING WITH 6-MESSAGE MEMORY ======
+    // Keep complete user/assistant turns so the model can follow the conversation naturally.
     let lastMessages = await MessageLog.find({ telegramId: chatId })
       .sort({ timestamp: -1 })
-      .limit(6)
+      .limit(16)
       .lean();
 
     lastMessages = lastMessages.reverse();
-
-    let conversationContext = "";
-    for (const msg of lastMessages) {
-      conversationContext += `User: ${msg.message}\nAI: ${msg.response}\n`;
-    }
-
-    conversationContext += `User: ${text}\nAI:`;
-
-
-    const aiReply = await getAIReply(conversationContext, user);
+    const aiReply = await getAIReply(text, user, lastMessages);
 
     await MessageLog.create({
       telegramId: chatId,
@@ -590,52 +581,86 @@ Want me to stay and chat with you more? Unlock full access now 💋 unlimited ph
 
 // ================= RAZORPAY WEBHOOK =================
 // ======== RAZORPAY WEBHOOK =========
-app.post("/razorpay/webhook", express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf.toString();
-  }
-}), async (req, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
-  const signature = req.headers["x-razorpay-signature"];
-
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(req.rawBody)
-    .digest("hex");
-
-  if (signature !== expected) {
+app.post("/razorpay/webhook", async (req, res) => {
+  if (!verifyWebhookSignature(req.rawBody, req.headers["x-razorpay-signature"], process.env.RAZORPAY_WEBHOOK_SECRET)) {
     return res.status(400).send("Invalid signature");
   }
 
-  const payload = req.body;
+  const paymentEntity = getCapturedPayment(req.body);
+  if (!paymentEntity) return res.sendStatus(200);
 
-  res.sendStatus(200);
+  const telegramId = paymentEntity.notes?.telegramId;
+  const amount = Number(paymentEntity.amount) / 100;
+  if (!telegramId || !getPlan(amount)) {
+    console.warn("Ignored captured payment with missing user or unsupported amount", paymentEntity.id);
+    return res.sendStatus(200);
+  }
+
+  try {
+    const activation = await activatePayment({
+      paymentId: paymentEntity.id,
+      telegramId,
+      amount,
+      verifiedAt: new Date((paymentEntity.captured_at || paymentEntity.created_at || Date.now() / 1000) * 1000),
+      source: "webhook",
+      raw: paymentEntity,
+    });
+    if (!activation.duplicate) {
+      await bot.sendMessage(
+        telegramId,
+        `✅ Payment received! Your plan is active until *${formatExpiry(activation.user.planExpiresAt)}*.`,
+        { parse_mode: "Markdown" }
+      );
+    }
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error("Payment webhook activation failed:", error.message);
+    return res.sendStatus(500);
+  }
 });
 //=======Payment Status=====
 app.get("/api/payments/check/:telegramId", async (req, res) => {
   const { telegramId } = req.params;
 
   try {
-    const payment = await Payment.findOne({ telegramId }).sort({ verifiedAt: -1 });
+    const payment = await Payment.findOne({ telegramId })
+      .select("paymentId telegramId amount planLabel verifiedAt expiresAt status")
+      .sort({ verifiedAt: -1 });
 
     if (!payment) {
       return res.status(404).json({ success: false, message: "No payment found for this Telegram ID" });
     }
 
-    // Handle expiration based on plan (assume 1-day plan)
-    const isExpired =
-      payment.verifiedAt &&
-      new Date().getTime() - new Date(payment.verifiedAt).getTime() > 24 * 60 * 60 * 1000;
+    const legacyPlan = getPlan(payment.amount);
+    const effectiveExpiry = payment.expiresAt || (legacyPlan && payment.verifiedAt
+      ? new Date(new Date(payment.verifiedAt).getTime() + legacyPlan.durationMs)
+      : null);
+    const isExpired = !effectiveExpiry || new Date(effectiveExpiry) <= new Date();
+    const publicPayment = { ...payment.toObject(), notes: { telegramId: payment.telegramId } };
 
     if (isExpired) {
-      return res.json({ success: true, valid: false, message: "Subscription expired", payment });
+      return res.json({ success: true, valid: false, message: "Subscription expired", payment: publicPayment, expiresAt: effectiveExpiry });
     }
 
-    return res.json({ success: true, valid: true, message: "Payment valid", payment });
+    return res.json({ success: true, valid: true, message: "Payment valid", payment: publicPayment, expiresAt: effectiveExpiry });
   } catch (err) {
     console.error("Payment check error:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
+});
+
+app.get("/health", (req, res) => {
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    status: databaseReady ? "ok" : "degraded",
+    database: databaseReady ? "connected" : "disconnected",
+  });
+});
+
+app.use((error, req, res, next) => {
+  console.error("Unhandled request error:", error.message);
+  if (res.headersSent) return next(error);
+  return res.status(500).json({ error: "Internal server error" });
 });
 
 // ================= START SERVER Deployment =================
@@ -665,7 +690,7 @@ mongoose
 // Scheduler: Run every day at 8 PM IST (Asia/Kolkata)
 cron.schedule("0 20 * * *", async () => {
   try {
-    const users = await User.find({});
+    const users = await User.find({ notificationsEnabled: true });
 
     if (users.length === 0) {
       console.log("⛔ No users found.");
@@ -926,17 +951,6 @@ cron.schedule("0 20 * * *", async () => {
 }, {
   timezone: "Asia/Kolkata"
 });
-
-
-
-
-
-
-
-
-
-
-
 
 
 

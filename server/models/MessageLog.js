@@ -1,11 +1,12 @@
-// models/MessageLog.js
 const mongoose = require("mongoose");
 
 const messageSchema = new mongoose.Schema({
-  telegramId: String,
-  message: String,
-  response: String,
-  timestamp: { type: Date, default: Date.now },
+  telegramId: { type: String, required: true, index: true },
+  message: { type: String, required: true },
+  response: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now, index: true },
 });
 
-module.exports = mongoose.model("MessageLog", messageSchema);
+messageSchema.index({ telegramId: 1, timestamp: -1 });
+
+module.exports = mongoose.models.MessageLog || mongoose.model("MessageLog", messageSchema);
