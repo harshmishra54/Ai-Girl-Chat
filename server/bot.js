@@ -19,6 +19,7 @@ const ProcessedUpdate = require("./models/ProcessedUpdate");
 const { activatePayment, expireSubscriptionIfNeeded } = require("./utils/paymentService");
 const { PLANS, getPlan, hasActiveSubscription, formatExpiry } = require("./utils/subscription");
 const { verifyWebhookSignature, getCapturedPayment } = require("./utils/razorpayWebhook");
+const { classifySignal, nextIntimacyLevel, relationshipStage } = require("./utils/conversationState");
 // ===== UI OPTIONS =====
 const moods = [
   "💖 Romantic",
@@ -43,6 +44,36 @@ const intensityButtons = {
   "🌶 Spicy": "spicy",
   "✨ Adaptive": "adaptive",
 };
+
+const controlButtons = {
+  "💕 Gentle Control": "gentle",
+  "😏 Teasing Control": "teasing",
+  "🔥 Assertive Control": "assertive",
+  "⛓️ Dominant Control": "dominant",
+};
+
+function mainKeyboard(dominant = false) {
+  const keyboard = [
+    [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+    [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+    [{ text: "🌶 Intensity" }, { text: "🎛 Control" }],
+    [{ text: "⚙️ Preferences" }],
+  ];
+  if (dominant) keyboard.unshift([
+    { text: "🟢 Continue" },
+    { text: "🟡 Slow down" },
+    { text: "🔴 Stop" },
+  ]);
+  return { keyboard, resize_keyboard: true };
+}
+
+function parsePreferenceList(value, maxItems = 12) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim().slice(0, 80))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
 
 function adultConsentKeyboard() {
   return {
@@ -93,6 +124,8 @@ bot.setMyCommands([
   { command: "setscene", description: "🎭 Set roleplay scene" },
   { command: "setname", description: "📝 Set your name" },
   { command: "intensity", description: "🌶 Set flirting intensity" },
+  { command: "control", description: "🎛 Set control style" },
+  { command: "preferences", description: "⚙️ Set adult preferences" },
   { command: "plans", description: "💎 View subscription plans" },
   { command: "subscription", description: "⏳ Check subscription" },
   { command: "notifications", description: "🔔 Manage messages" },
@@ -191,6 +224,14 @@ async function sendPlans(chatId) {
 app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   const update = req.body;
 
+  const telegramWebhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (
+    telegramWebhookSecret &&
+    req.headers["x-telegram-bot-api-secret-token"] !== telegramWebhookSecret
+  ) {
+    return res.sendStatus(401);
+  }
+
   if (Number.isInteger(update.update_id)) {
     try {
       await ProcessedUpdate.create({ updateId: update.update_id });
@@ -232,6 +273,9 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (text === "❌ I am under 18") {
     user.adultConsentAt = null;
+    user.dominanceConsentAt = null;
+    user.dominanceLevel = "teasing";
+    user.intimacyLevel = 0;
     await user.save();
     await bot.sendMessage(
       chatId,
@@ -243,6 +287,9 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   if (text === "/consent revoke") {
     user.adultConsentAt = null;
+    user.dominanceConsentAt = null;
+    user.dominanceLevel = "teasing";
+    user.intimacyLevel = 0;
     await user.save();
     await bot.sendMessage(
       chatId,
@@ -259,14 +306,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       chatId,
       "Age confirmation saved ✅ You can change the vibe anytime from the buttons below.",
       {
-        reply_markup: {
-          keyboard: [
-            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-            [{ text: "🌶 Intensity" }],
-          ],
-          resize_keyboard: true,
-        },
+        reply_markup: mainKeyboard(false),
       }
     );
     return res.sendStatus(200);
@@ -281,14 +321,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       chatId,
       "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
       {
-        reply_markup: {
-          keyboard: [
-            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-            [{ text: "🌶 Intensity" }]
-          ],
-          resize_keyboard: true
-        }
+        reply_markup: mainKeyboard(user.dominanceLevel === "dominant")
       }
     );
     return res.sendStatus(200);
@@ -389,15 +422,215 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       await user.save();
       await bot.sendMessage(chatId, `Vibe set to *${requestedLevel}* 😏`, {
         parse_mode: "Markdown",
+        reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+      });
+    }
+    return res.sendStatus(200);
+  }
+
+  if (text === "🎛 Control" || text === "/control") {
+    await bot.sendMessage(chatId, "Choose how much Ayesha should lead the conversation:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💕 Gentle Control" }, { text: "😏 Teasing Control" }],
+          [{ text: "🔥 Assertive Control" }, { text: "⛓️ Dominant Control" }],
+          [{ text: "🔙 Main Menu" }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+    return res.sendStatus(200);
+  }
+
+  if (controlButtons[text]) {
+    const selectedControl = controlButtons[text];
+    if (selectedControl === "dominant" && !user.dominanceConsentAt) {
+      await bot.sendMessage(
+        chatId,
+        "⛓️ Dominant mode includes assertive, commanding adult roleplay. It never overrides stop, slow down, or your stated limits. Do you explicitly consent?",
+        {
+          reply_markup: {
+            keyboard: [
+              [{ text: "✅ I consent to dominant roleplay" }],
+              [{ text: "❌ Cancel dominant mode" }],
+            ],
+            resize_keyboard: true,
+            one_time_keyboard: true,
+          },
+        }
+      );
+      return res.sendStatus(200);
+    }
+    user.dominanceLevel = selectedControl;
+    if (selectedControl !== "dominant") user.intimacyLevel = Math.min(user.intimacyLevel || 0, 3);
+    await user.save();
+    await bot.sendMessage(chatId, `Control style set to *${selectedControl}*.`, {
+      parse_mode: "Markdown",
+      reply_markup: mainKeyboard(selectedControl === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "✅ I consent to dominant roleplay") {
+    user.dominanceConsentAt = new Date();
+    user.dominanceLevel = "dominant";
+    await user.save();
+    await bot.sendMessage(chatId, "Dominant mode enabled. You remain in control with Continue, Slow down, and Stop.", {
+      reply_markup: mainKeyboard(true),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "❌ Cancel dominant mode") {
+    user.dominanceLevel = "teasing";
+    await user.save();
+    await bot.sendMessage(chatId, "Dominant mode was not enabled.", { reply_markup: mainKeyboard(false) });
+    return res.sendStatus(200);
+  }
+
+  if (text === "🔴 Stop") {
+    user.intimacyLevel = 0;
+    user.dominanceLevel = "teasing";
+    await user.save();
+    await bot.sendMessage(
+      chatId,
+      user.aftercareEnabled
+        ? "Stopped. You’re safe and in control 💛 We can slow down, change the subject, or just talk."
+        : "Stopped. We will not continue that scene.",
+      { reply_markup: mainKeyboard(false) }
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === "🟡 Slow down") {
+    user.intimacyLevel = nextIntimacyLevel(user.intimacyLevel, "slow");
+    await user.save();
+    await bot.sendMessage(chatId, "Slowing down. I’ll keep it gentler and follow your pace.", {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "🔙 Main Menu") {
+    await bot.sendMessage(chatId, "Back to the main menu.", {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "⚙️ Preferences" || text === "/preferences") {
+    await bot.sendMessage(
+      chatId,
+      "Set your preferences:\n\n`/terms word1, word2`\n`/fantasy your preferred adult fantasy`\n`/hardlimit limit1, limit2`\n`/softlimit limit1, limit2`\n`/petname preferred name`\n`/preferences clear`\n\nLimits always override intensity and control settings.",
+      {
+        parse_mode: "Markdown",
         reply_markup: {
           keyboard: [
-            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-            [{ text: "🌶 Intensity" }],
+            [{ text: "💛 Aftercare On" }, { text: "🖤 Aftercare Off" }],
+            [{ text: "🗣 Language" }, { text: "📏 Reply Length" }],
+            [{ text: "🔙 Main Menu" }],
           ],
           resize_keyboard: true,
         },
-      });
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === "💛 Aftercare On" || text === "🖤 Aftercare Off") {
+    user.aftercareEnabled = text === "💛 Aftercare On";
+    await user.save();
+    await bot.sendMessage(chatId, `Aftercare is now ${user.aftercareEnabled ? "on" : "off"}.`, {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "🗣 Language") {
+    await bot.sendMessage(chatId, "Choose the chat language:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "🗣 Adaptive" }, { text: "🇮🇳 Hinglish" }],
+          [{ text: "हिंदी Hindi" }, { text: "🇬🇧 English" }],
+          [{ text: "🔙 Main Menu" }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+    return res.sendStatus(200);
+  }
+
+  const languageButtons = {
+    "🗣 Adaptive": "adaptive",
+    "🇮🇳 Hinglish": "hinglish",
+    "हिंदी Hindi": "hindi",
+    "🇬🇧 English": "english",
+  };
+  if (languageButtons[text]) {
+    user.languagePreference = languageButtons[text];
+    await user.save();
+    await bot.sendMessage(chatId, `Language set to ${user.languagePreference}.`, {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "📏 Reply Length") {
+    await bot.sendMessage(chatId, "Choose reply length:", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💬 Short Replies" }, { text: "📝 Medium Replies" }],
+          [{ text: "🔙 Main Menu" }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "💬 Short Replies" || text === "📝 Medium Replies") {
+    user.messageLengthPreference = text === "💬 Short Replies" ? "short" : "medium";
+    await user.save();
+    await bot.sendMessage(chatId, `Reply length set to ${user.messageLengthPreference}.`, {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "/preferences clear") {
+    user.preferredTerms = [];
+    user.preferredFantasy = "";
+    user.hardLimits = [];
+    user.softLimits = [];
+    user.preferredPetName = "";
+    await user.save();
+    await bot.sendMessage(chatId, "Saved preferences and limits were cleared.", {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
+    return res.sendStatus(200);
+  }
+
+  const preferenceCommands = [
+    { prefix: "/terms ", field: "preferredTerms", list: true, label: "Preferred terms" },
+    { prefix: "/fantasy ", field: "preferredFantasy", list: false, label: "Fantasy" },
+    { prefix: "/hardlimit ", field: "hardLimits", list: true, label: "Hard limits" },
+    { prefix: "/softlimit ", field: "softLimits", list: true, label: "Soft limits" },
+    { prefix: "/petname ", field: "preferredPetName", list: false, label: "Pet name" },
+  ];
+  const preferenceCommand = preferenceCommands.find(({ prefix }) => text.toLowerCase().startsWith(prefix));
+  if (preferenceCommand) {
+    const value = text.slice(preferenceCommand.prefix.length).trim();
+    if (!value) {
+      await bot.sendMessage(chatId, `${preferenceCommand.label} cannot be empty.`);
+    } else {
+      user[preferenceCommand.field] = preferenceCommand.list
+        ? parsePreferenceList(value)
+        : value.slice(0, 300);
+      await user.save();
+      await bot.sendMessage(chatId, `${preferenceCommand.label} saved privately.`);
     }
     return res.sendStatus(200);
   }
@@ -466,14 +699,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     await user.save();
 
     await bot.sendMessage(chatId, `Mood changed to ${text} 😉`, {
-      reply_markup: {
-        keyboard: [
-          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-          [{ text: "🌶 Intensity" }]
-        ],
-        resize_keyboard: true
-      }
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
     });
 
     return res.sendStatus(200);
@@ -509,14 +735,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
     await bot.sendMessage(chatId, `Scene set to *${text}* 😏`, {
       parse_mode: "Markdown",
-      reply_markup: {
-        keyboard: [
-          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-          [{ text: "🌶 Intensity" }]
-        ],
-        resize_keyboard: true
-      }
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
     });
 
     return res.sendStatus(200);
@@ -527,14 +746,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     await user.save();
 
     await bot.sendMessage(chatId, "Scene cleared 😉", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
-          [{ text: "🌶 Intensity" }]
-        ],
-        resize_keyboard: true
-      }
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
     });
 
     return res.sendStatus(200);
@@ -640,6 +852,34 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   // ========== AI CHAT ==========
   try {
+    const signal = classifySignal(text);
+    if (signal === "stop") {
+      user.intimacyLevel = 0;
+      user.dominanceLevel = "teasing";
+      await user.save();
+      await bot.sendMessage(
+        chatId,
+        user.aftercareEnabled
+          ? "Stopped. You’re safe and in control 💛 We can change the subject or just talk."
+          : "Stopped. We will not continue that scene.",
+        { reply_markup: mainKeyboard(false) }
+      );
+      return res.sendStatus(200);
+    }
+    if (signal === "slow") {
+      user.intimacyLevel = nextIntimacyLevel(user.intimacyLevel, signal);
+      await user.save();
+      await bot.sendMessage(chatId, "Got it—I’m slowing down and following your pace.", {
+        reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+      });
+      return res.sendStatus(200);
+    }
+
+    user.intimacyLevel = nextIntimacyLevel(user.intimacyLevel, signal);
+    user.messageCount = (user.messageCount || 0) + 1;
+    user.relationshipStage = relationshipStage(user.messageCount);
+    await user.save();
+
     await bot.sendChatAction(chatId, "typing");
 
     // Keep complete user/assistant turns so the model can follow the conversation naturally.
@@ -658,7 +898,9 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       timestamp: new Date(),
     });
 
-    await bot.sendMessage(chatId, aiReply);
+    await bot.sendMessage(chatId, aiReply, {
+      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    });
 
     // const tempDir = path.join(__dirname, "temp");
     // if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
@@ -769,8 +1011,15 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use((error, req, res, next) => {
+app.use(async (error, req, res, next) => {
   console.error("Unhandled request error:", error.message);
+  if (Number.isInteger(req.body?.update_id)) {
+    try {
+      await ProcessedUpdate.deleteOne({ updateId: req.body.update_id });
+    } catch (cleanupError) {
+      console.error("Failed to release Telegram update lock:", cleanupError.message);
+    }
+  }
   if (res.headersSent) return next(error);
   return res.status(500).json({ error: "Internal server error" });
 });
@@ -788,7 +1037,10 @@ mongoose
       });
 
       const url = `${APP_URL}/bot${BOT_TOKEN}`;
-      bot.setWebHook(url).then(() => {
+      const webhookOptions = process.env.TELEGRAM_WEBHOOK_SECRET
+        ? { secret_token: process.env.TELEGRAM_WEBHOOK_SECRET }
+        : {};
+      bot.setWebHook(url, webhookOptions).then(() => {
         console.log(`Webhook set: ${url}`);
       });
     } else {
@@ -1063,15 +1315,6 @@ cron.schedule("0 20 * * *", async () => {
 }, {
   timezone: "Asia/Kolkata"
 });
-
-
-
-
-
-
-
-
-
 
 
 
