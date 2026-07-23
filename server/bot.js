@@ -37,6 +37,32 @@ const scenes = {
   "🚗 Long Drive": "long drive"
 };
 
+const intensityButtons = {
+  "💕 Sweet": "sweet",
+  "🔥 Flirty": "flirty",
+  "🌶 Spicy": "spicy",
+  "✨ Adaptive": "adaptive",
+};
+
+function adultConsentKeyboard() {
+  return {
+    keyboard: [
+      [{ text: "✅ I confirm I am 18+" }],
+      [{ text: "❌ I am under 18" }],
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: true,
+  };
+}
+
+async function askForAdultConsent(chatId) {
+  await bot.sendMessage(
+    chatId,
+    "🔞 *Adults only*\n\nThis bot may provide romantic and sexually explicit AI-generated conversations. By continuing, you confirm that you are at least 18 years old and consent to receiving adult content.\n\nYou can stop at any time or delete your data with /deleteaccount.",
+    { parse_mode: "Markdown", reply_markup: adultConsentKeyboard() }
+  );
+}
+
 require("dotenv").config();
 
 const checkPaymentStatus = require("./utils/checkPaymentStatus");
@@ -70,6 +96,7 @@ bot.setMyCommands([
   { command: "plans", description: "💎 View subscription plans" },
   { command: "subscription", description: "⏳ Check subscription" },
   { command: "notifications", description: "🔔 Manage messages" },
+  { command: "consent", description: "🔞 Manage adult consent" },
   { command: "deleteaccount", description: "🗑 Delete your data" },
   { command: "top", description: "🏆 Top leaderboard members" },
   { command: "reset", description: "🧹 Reset chat memory" }, // <-- New command
@@ -202,7 +229,54 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
 
   const now = new Date();
   const isOwner = user.telegramId === "1469113335";
+
+  if (text === "❌ I am under 18") {
+    user.adultConsentAt = null;
+    await user.save();
+    await bot.sendMessage(
+      chatId,
+      "This service is only available to adults aged 18 or older. You cannot use the chat or adult features.",
+      { reply_markup: { remove_keyboard: true } }
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === "/consent revoke") {
+    user.adultConsentAt = null;
+    await user.save();
+    await bot.sendMessage(
+      chatId,
+      "Adult-content consent has been withdrawn. Chat and adult features are now blocked.",
+      { reply_markup: { remove_keyboard: true } }
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === "✅ I confirm I am 18+") {
+    user.adultConsentAt = new Date();
+    await user.save();
+    await bot.sendMessage(
+      chatId,
+      "Age confirmation saved ✅ You can change the vibe anytime from the buttons below.",
+      {
+        reply_markup: {
+          keyboard: [
+            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+            [{ text: "🌶 Intensity" }],
+          ],
+          resize_keyboard: true,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+
   if (text === "/start") {
+    if (!user.adultConsentAt) {
+      await askForAdultConsent(chatId);
+      return res.sendStatus(200);
+    }
     await bot.sendMessage(
       chatId,
       "👋 Hey, I'm Ayesha! You’ve got 10 minutes of free chat. Want a surprise photo anytime? Just tap the button below 👇",
@@ -210,13 +284,23 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
         reply_markup: {
           keyboard: [
             [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-            [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+            [{ text: "🌶 Intensity" }]
           ],
           resize_keyboard: true
         }
       }
     );
     return res.sendStatus(200);
+  }
+
+  if (!user.adultConsentAt) {
+    if (text === "/deleteaccount" || text === "/deleteaccount confirm") {
+      // Data-deletion commands remain available without adult-content consent.
+    } else {
+      await askForAdultConsent(chatId);
+      return res.sendStatus(200);
+    }
   }
   if (text === "📸 Send me a Photo" || text === "/photo") {
     const now = new Date();
@@ -256,6 +340,7 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       "/subscription - Check access\n" +
       "/intensity - Set the chat vibe\n" +
       "/notifications on|off - Optional messages\n" +
+      "/consent revoke - Withdraw adult consent\n" +
       "/reset - Delete chat memory\n" +
       "/deleteaccount - Delete your profile\n" +
       "/verify payment_id - Manual payment fallback",
@@ -275,8 +360,22 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     return res.sendStatus(200);
   }
 
-  if (text.startsWith("/intensity")) {
-    const requestedLevel = text.split(" ")[1]?.toLowerCase();
+  if (text === "🌶 Intensity" || text === "/intensity") {
+    await bot.sendMessage(chatId, "How intense should our chat feel? 😏", {
+      reply_markup: {
+        keyboard: [
+          [{ text: "💕 Sweet" }, { text: "🔥 Flirty" }],
+          [{ text: "🌶 Spicy" }, { text: "✨ Adaptive" }],
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text.startsWith("/intensity") || intensityButtons[text]) {
+    const requestedLevel = intensityButtons[text] || text.split(" ")[1]?.toLowerCase();
     const allowedLevels = ["adaptive", "sweet", "flirty", "spicy"];
 
     if (!allowedLevels.includes(requestedLevel)) {
@@ -288,7 +387,17 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     } else {
       user.flirtLevel = requestedLevel;
       await user.save();
-      await bot.sendMessage(chatId, `Vibe set to *${requestedLevel}* 😏`, { parse_mode: "Markdown" });
+      await bot.sendMessage(chatId, `Vibe set to *${requestedLevel}* 😏`, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
+            [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+            [{ text: "🌶 Intensity" }],
+          ],
+          resize_keyboard: true,
+        },
+      });
     }
     return res.sendStatus(200);
   }
@@ -360,7 +469,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       reply_markup: {
         keyboard: [
           [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+          [{ text: "🌶 Intensity" }]
         ],
         resize_keyboard: true
       }
@@ -402,7 +512,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       reply_markup: {
         keyboard: [
           [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+          [{ text: "🌶 Intensity" }]
         ],
         resize_keyboard: true
       }
@@ -419,7 +530,8 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
       reply_markup: {
         keyboard: [
           [{ text: "💬 Chat" }, { text: "📸 Send me a Photo" }],
-          [{ text: "💖 Mood" }, { text: "🎭 Scene" }]
+          [{ text: "💖 Mood" }, { text: "🎭 Scene" }],
+          [{ text: "🌶 Intensity" }]
         ],
         resize_keyboard: true
       }
@@ -951,8 +1063,6 @@ cron.schedule("0 20 * * *", async () => {
 }, {
   timezone: "Asia/Kolkata"
 });
-
-
 
 
 

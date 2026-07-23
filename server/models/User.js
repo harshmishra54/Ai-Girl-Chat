@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
     default: "adaptive",
   },
   notificationsEnabled: { type: Boolean, default: false },
+  adultConsentAt: Date,
 }, { timestamps: true });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
