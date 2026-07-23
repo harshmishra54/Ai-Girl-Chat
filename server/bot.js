@@ -75,6 +75,43 @@ function parsePreferenceList(value, maxItems = 12) {
     .slice(0, maxItems);
 }
 
+function preferenceSummary(user) {
+  const labels = {
+    adaptive: "Adaptive",
+    hinglish: "Hinglish",
+    hindi: "Hindi",
+    english: "English",
+    short: "Short",
+    medium: "Medium",
+    mirror: "Mirror my wording",
+    soft: "Soft and suggestive",
+    bold: "Bold and confident",
+    direct: "Direct adult wording",
+  };
+  return [
+    `🗣 Language: ${labels[user.languagePreference] || "Adaptive"}`,
+    `📏 Reply length: ${labels[user.messageLengthPreference] || "Short"}`,
+    `💬 Talking style: ${labels[user.vocabularyStyle] || "Mirror my wording"}`,
+    `💕 Pet name: ${user.preferredPetName || "Automatic"}`,
+    `🎭 Fantasy style: ${user.preferredFantasy || "Follow the conversation"}`,
+    `💛 Aftercare: ${user.aftercareEnabled === false ? "Off" : "On"}`,
+    `🚫 Boundaries: ${user.hardLimits?.length ? user.hardLimits.join(", ") : "None selected"}`,
+  ].join("\n");
+}
+
+function preferencesKeyboard() {
+  return {
+    keyboard: [
+      [{ text: "💬 Talking Style" }, { text: "🎭 Fantasy Style" }],
+      [{ text: "🚫 Boundaries" }, { text: "💕 Pet Name" }],
+      [{ text: "🗣 Language" }, { text: "📏 Reply Length" }],
+      [{ text: "💛 Aftercare Settings" }],
+      [{ text: "🧹 Reset Preferences" }, { text: "🔙 Main Menu" }],
+    ],
+    resize_keyboard: true,
+  };
+}
+
 function adultConsentKeyboard() {
   return {
     keyboard: [
@@ -522,14 +559,24 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "⚙️ Preferences" || text === "/preferences") {
     await bot.sendMessage(
       chatId,
-      "Set your preferences:\n\n`/terms word1, word2`\n`/fantasy your preferred adult fantasy`\n`/hardlimit limit1, limit2`\n`/softlimit limit1, limit2`\n`/petname preferred name`\n`/preferences clear`\n\nLimits always override intensity and control settings.",
+      `⚙️ Make the chat feel right for you\n\n${preferenceSummary(user)}\n\nTap any setting below to see simple choices. You never need to type a command.`,
+      {
+        reply_markup: preferencesKeyboard(),
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  if (text === "💛 Aftercare Settings") {
+    await bot.sendMessage(
+      chatId,
+      "💛 *Aftercare* controls what happens after an intense scene or when you press Stop.\n\nOn: Ayesha becomes calm, affectionate, and reassuring.\nOff: She simply ends the scene without emotional follow-up.",
       {
         parse_mode: "Markdown",
         reply_markup: {
           keyboard: [
             [{ text: "💛 Aftercare On" }, { text: "🖤 Aftercare Off" }],
-            [{ text: "🗣 Language" }, { text: "📏 Reply Length" }],
-            [{ text: "🔙 Main Menu" }],
+            [{ text: "⚙️ Back to Preferences" }],
           ],
           resize_keyboard: true,
         },
@@ -541,24 +588,192 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
   if (text === "💛 Aftercare On" || text === "🖤 Aftercare Off") {
     user.aftercareEnabled = text === "💛 Aftercare On";
     await user.save();
-    await bot.sendMessage(chatId, `Aftercare is now ${user.aftercareEnabled ? "on" : "off"}.`, {
-      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    await bot.sendMessage(chatId, `Aftercare is now ${user.aftercareEnabled ? "on 💛" : "off 🖤"}.`, {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "💬 Talking Style") {
+    await bot.sendMessage(
+      chatId,
+      "💬 *Talking Style* controls how Ayesha chooses adult words.\n\n🌸 Soft: suggestive and less explicit\n😏 Bold: confident with some direct wording\n🔥 Direct: explicit adult wording when the conversation allows it\n🪞 Mirror Me: matches the words and tone you use",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "🌸 Soft Words" }, { text: "😏 Bold Words" }],
+            [{ text: "🔥 Direct Words" }, { text: "🪞 Mirror My Words" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  const talkingStyleButtons = {
+    "🌸 Soft Words": "soft",
+    "😏 Bold Words": "bold",
+    "🔥 Direct Words": "direct",
+    "🪞 Mirror My Words": "mirror",
+  };
+  if (talkingStyleButtons[text]) {
+    user.vocabularyStyle = talkingStyleButtons[text];
+    await user.save();
+    await bot.sendMessage(chatId, `Talking style saved: ${talkingStyleButtons[text]}.`, {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "🎭 Fantasy Style") {
+    await bot.sendMessage(
+      chatId,
+      "🎭 *Fantasy Style* gives Ayesha a preferred direction without locking every conversation into one script.\n\n💞 Romantic: affectionate and sensual\n😈 Teasing: playful tension and anticipation\n⛓️ Power Play: consensual control and commands\n🎮 You Lead: Ayesha follows your direction\n✨ Adaptive: follows the current conversation",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "💞 Romantic Fantasy" }, { text: "😈 Teasing Fantasy" }],
+            [{ text: "⛓️ Power Play Fantasy" }, { text: "🎮 I Lead Fantasy" }],
+            [{ text: "✨ Adaptive Fantasy" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  const fantasyButtons = {
+    "💞 Romantic Fantasy": "Romantic and sensual",
+    "😈 Teasing Fantasy": "Playful teasing and anticipation",
+    "⛓️ Power Play Fantasy": "Consensual power play",
+    "🎮 I Lead Fantasy": "User-led fantasy",
+    "✨ Adaptive Fantasy": "",
+  };
+  if (Object.hasOwn(fantasyButtons, text)) {
+    if (text === "⛓️ Power Play Fantasy" && !user.dominanceConsentAt) {
+      await bot.sendMessage(chatId, "Power Play requires Dominant-mode consent first. Open 🎛 Control and choose Dominant.");
+      return res.sendStatus(200);
+    }
+    user.preferredFantasy = fantasyButtons[text];
+    await user.save();
+    await bot.sendMessage(chatId, `Fantasy style saved: ${fantasyButtons[text] || "Adaptive"}.`, {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "🚫 Boundaries") {
+    const selected = user.hardLimits?.length ? user.hardLimits.join(", ") : "None selected";
+    await bot.sendMessage(
+      chatId,
+      `🚫 Boundaries are always respected\n\nTap a boundary to turn it on or off. Selected now: ${selected}\n\nNo Insults: no degrading names\nNo Pain: no painful scenarios\nNo Commands: Ayesha cannot command you\nNo Rough Talk: keeps language gentler`,
+      {
+        reply_markup: {
+          keyboard: [
+            [{ text: "🚫 No Insults" }, { text: "🚫 No Pain" }],
+            [{ text: "🚫 No Commands" }, { text: "🚫 No Rough Talk" }],
+            [{ text: "✅ Clear Boundaries" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  const boundaryButtons = {
+    "🚫 No Insults": "No insults or degrading names",
+    "🚫 No Pain": "No pain",
+    "🚫 No Commands": "No commands",
+    "🚫 No Rough Talk": "No rough language",
+  };
+  if (boundaryButtons[text]) {
+    const boundary = boundaryButtons[text];
+    const current = new Set(user.hardLimits || []);
+    const enabled = !current.has(boundary);
+    if (enabled) current.add(boundary);
+    else current.delete(boundary);
+    user.hardLimits = [...current];
+    await user.save();
+    await bot.sendMessage(chatId, `${enabled ? "Enabled ✅" : "Removed"}: ${boundary}`, {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "✅ Clear Boundaries") {
+    user.hardLimits = [];
+    await user.save();
+    await bot.sendMessage(chatId, "Preset boundaries cleared. Stop and Slow Down remain available at all times.", {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "💕 Pet Name") {
+    await bot.sendMessage(
+      chatId,
+      "💕 *Pet Name* is what Ayesha will call you naturally during chats. Choose one, or select Automatic for variety.",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "💕 Jaan" }, { text: "😘 Baby" }, { text: "❤️ Babe" }],
+            [{ text: "😏 Handsome" }, { text: "👑 Sir" }],
+            [{ text: "✨ Automatic Pet Name" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
+    );
+    return res.sendStatus(200);
+  }
+
+  const petNameButtons = {
+    "💕 Jaan": "jaan",
+    "😘 Baby": "baby",
+    "❤️ Babe": "babe",
+    "😏 Handsome": "handsome",
+    "👑 Sir": "sir",
+    "✨ Automatic Pet Name": "",
+  };
+  if (Object.hasOwn(petNameButtons, text)) {
+    user.preferredPetName = petNameButtons[text];
+    await user.save();
+    await bot.sendMessage(chatId, `Pet name saved: ${petNameButtons[text] || "Automatic"}.`, {
+      reply_markup: preferencesKeyboard(),
     });
     return res.sendStatus(200);
   }
 
   if (text === "🗣 Language") {
-    await bot.sendMessage(chatId, "Choose the chat language:", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "🗣 Adaptive" }, { text: "🇮🇳 Hinglish" }],
-          [{ text: "हिंदी Hindi" }, { text: "🇬🇧 English" }],
-          [{ text: "🔙 Main Menu" }],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
+    await bot.sendMessage(
+      chatId,
+      "🗣 *Language* controls how Ayesha writes.\n\nAdaptive: matches whatever language you use\nHinglish: natural Hindi-English mix in Roman letters\nHindi: primarily Hindi\nEnglish: primarily English",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "🗣 Adaptive" }, { text: "🇮🇳 Hinglish" }],
+            [{ text: "हिंदी Hindi" }, { text: "🇬🇧 English" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
+    );
     return res.sendStatus(200);
   }
 
@@ -572,22 +787,27 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     user.languagePreference = languageButtons[text];
     await user.save();
     await bot.sendMessage(chatId, `Language set to ${user.languagePreference}.`, {
-      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+      reply_markup: preferencesKeyboard(),
     });
     return res.sendStatus(200);
   }
 
   if (text === "📏 Reply Length") {
-    await bot.sendMessage(chatId, "Choose reply length:", {
-      reply_markup: {
-        keyboard: [
-          [{ text: "💬 Short Replies" }, { text: "📝 Medium Replies" }],
-          [{ text: "🔙 Main Menu" }],
-        ],
-        resize_keyboard: true,
-        one_time_keyboard: true,
-      },
-    });
+    await bot.sendMessage(
+      chatId,
+      "📏 *Reply Length* controls message size.\n\nShort: quick 1–3 line messages that feel like live texting\nMedium: more detail in 3–5 lines while staying conversational",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          keyboard: [
+            [{ text: "💬 Short Replies" }, { text: "📝 Medium Replies" }],
+            [{ text: "⚙️ Back to Preferences" }],
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true,
+        },
+      }
+    );
     return res.sendStatus(200);
   }
 
@@ -595,20 +815,31 @@ app.post(`/bot${BOT_TOKEN}`, async (req, res) => {
     user.messageLengthPreference = text === "💬 Short Replies" ? "short" : "medium";
     await user.save();
     await bot.sendMessage(chatId, `Reply length set to ${user.messageLengthPreference}.`, {
-      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+      reply_markup: preferencesKeyboard(),
     });
     return res.sendStatus(200);
   }
 
-  if (text === "/preferences clear") {
+  if (text === "⚙️ Back to Preferences") {
+    await bot.sendMessage(chatId, `⚙️ Your current preferences\n\n${preferenceSummary(user)}`, {
+      reply_markup: preferencesKeyboard(),
+    });
+    return res.sendStatus(200);
+  }
+
+  if (text === "/preferences clear" || text === "🧹 Reset Preferences") {
     user.preferredTerms = [];
     user.preferredFantasy = "";
     user.hardLimits = [];
     user.softLimits = [];
     user.preferredPetName = "";
+    user.vocabularyStyle = "mirror";
+    user.languagePreference = "adaptive";
+    user.messageLengthPreference = "short";
+    user.aftercareEnabled = true;
     await user.save();
-    await bot.sendMessage(chatId, "Saved preferences and limits were cleared.", {
-      reply_markup: mainKeyboard(user.dominanceLevel === "dominant"),
+    await bot.sendMessage(chatId, "Preferences reset to safe automatic defaults.", {
+      reply_markup: preferencesKeyboard(),
     });
     return res.sendStatus(200);
   }
@@ -1315,10 +1546,6 @@ cron.schedule("0 20 * * *", async () => {
 }, {
   timezone: "Asia/Kolkata"
 });
-
-
-
-
 
 
 

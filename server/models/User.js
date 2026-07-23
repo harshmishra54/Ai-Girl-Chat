@@ -48,6 +48,11 @@ const userSchema = new mongoose.Schema({
     default: "short",
   },
   preferredPetName: { type: String, default: "" },
+  vocabularyStyle: {
+    type: String,
+    enum: ["mirror", "soft", "bold", "direct"],
+    default: "mirror",
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.models.User || mongoose.model("User", userSchema);
